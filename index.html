@@ -22,11 +22,15 @@ select,input{font-size:17px;padding:10px;border-radius:10px;border:1px solid #bb
 ul{padding-left:20px;margin:6px 0}li{margin:4px 0;font-size:15px}a{color:var(--b)}
 progress{width:100%;display:none}
 label.ck{display:flex;align-items:center;gap:8px;font-size:15px;margin:6px 0}label.ck input{width:auto}
-.stage{position:relative;width:100%;height:320px;background:#111;border-radius:12px;overflow:hidden;touch-action:none}
-#cropCanvas{width:100%;height:100%;display:block}
-#timeWarn{display:none;background:#fde8e8;color:#8a1c1c;border-radius:10px;padding:8px 10px;font-size:14px;margin:6px 0}
+.stage{position:relative;width:100%;height:280px;background:#111;border-radius:12px;overflow:hidden;touch-action:none}
+.stage canvas{width:100%;height:100%;display:block}
+.timeWarn{display:none;background:#fde8e8;color:#8a1c1c;border-radius:10px;padding:8px 10px;font-size:14px;margin:6px 0}
 .timelab{font-size:13px;font-weight:700;color:#555;margin-top:6px}
-#timeReadout{font-weight:700;color:#111}
+.timeReadout{font-weight:700;color:#111}
+.photo{display:none}
+.arrow label{display:flex;align-items:center;gap:8px;padding:8px 2px;font-size:16px}
+.arrow input{width:auto;margin:0}
+.diagram{width:100%;height:auto;display:block;margin:6px 0}
 </style></head><body>
 <header>🚗 Can I Park Here? <small>NYC sign checker · proof of concept</small></header>
 <main>
@@ -36,25 +40,46 @@ label.ck{display:flex;align-items:center;gap:8px;font-size:15px;margin:6px 0}lab
  <div id="aspBox" class="asp" style="margin-top:8px">Loading today's Alternate Side Parking status…</div>
 </div>
 
-<div class="card"><h2>2 · Sign photo</h2>
- <label class="btn" for="photo">📷 Snap / upload sign</label>
- <input id="photo" type="file" accept="image/*" capture="environment" style="display:none">
- <div id="cropBox" style="display:none">
-  <div id="stage" class="stage"><canvas id="cropCanvas"></canvas></div>
-  <label class="muted">Zoom <input id="zoom" type="range" min="1" max="6" step="0.05" value="1"></label>
-  <div class="muted">Drag the photo so the sign fills the blue frame. Pinch or use the slider if the sign is small or far away. Arrows on the sign are not read.</div>
-  <button type="button" id="readBtn">Read sign in the frame</button>
-  <button type="button" class="sec" id="readFullBtn">Read the whole photo instead</button>
-  <button type="button" class="sec" id="resetFrame">Reset zoom</button>
- </div>
- <progress id="prog" max="1" value="0"></progress>
- <div id="ocrStatus" class="muted"></div>
+<div class="card">
+ <h2>Which way does the arrow point?</h2>
+ <svg class="diagram" viewBox="0 0 320 78" role="img" aria-label="A car, then an arrow toward a sign pole, then an arrow away from it.">
+  <rect x="8" y="28" width="48" height="26" rx="6" fill="#111"/>
+  <text x="32" y="45" text-anchor="middle" fill="#fff" font-size="12" font-family="system-ui,sans-serif">car</text>
+  <line x1="66" y1="40" x2="118" y2="40" stroke="#0a7d32" stroke-width="4"/>
+  <polygon points="66,40 80,32 80,48" fill="#0a7d32"/>
+  <text x="92" y="22" text-anchor="middle" fill="#0a7d32" font-size="11" font-family="system-ui,sans-serif">toward car</text>
+  <rect x="132" y="14" width="52" height="32" rx="3" fill="#fff" stroke="#c62828" stroke-width="2"/>
+  <text x="158" y="34" text-anchor="middle" fill="#c62828" font-size="11" font-family="system-ui,sans-serif">SIGN</text>
+  <line x1="158" y1="46" x2="158" y2="72" stroke="#333" stroke-width="4"/>
+  <line x1="196" y1="40" x2="250" y2="40" stroke="#c62828" stroke-width="4"/>
+  <polygon points="262,40 248,32 248,48" fill="#c62828"/>
+  <text x="236" y="22" text-anchor="middle" fill="#c62828" font-size="11" font-family="system-ui,sans-serif">away</text>
+ </svg>
+ <p class="muted">On an NYC sign, the arrow shows which side of the pole the rule covers. Pick that direction relative to your car. No arrow means it applies both ways. A sign pointing away is not used.</p>
 </div>
-
-<div class="card"><h2>3 · Sign text (check &amp; fix)</h2>
- <textarea id="txt" placeholder="e.g. 3 HOUR METERED PARKING COMMERCIAL VEHICLES ONLY 7AM-7PM EXCEPT SUNDAY&#10;&#10;Put a blank line between signs"></textarea>
- <details id="builder"><summary class="muted">Or build a sign quickly</summary>
-  <select id="pType">
+<div id="signList"></div>
+<template id="signTpl">
+<div class="card sign">
+ <h2 class="signTitle"></h2>
+ <div class="arrow" role="radiogroup">
+  <label><input type="radio" value="toward" checked> Points toward my car</label>
+  <label><input type="radio" value="away"> Points away from my car</label>
+  <label><input type="radio" value="both"> No arrow (both ways)</label>
+ </div>
+ <label class="btn">📷 Snap / upload sign<input class="photo" type="file" accept="image/*" capture="environment"></label>
+ <div class="cropBox" style="display:none">
+  <div class="stage"><canvas></canvas></div>
+  <label class="muted">Zoom <input class="zoom" type="range" min="1" max="6" step="0.05" value="1"></label>
+  <div class="muted">Drag the photo so the sign fills the blue frame. Pinch or use the slider if the sign is small. The arrow itself is not read — set it above.</div>
+  <button type="button" class="readBtn">Read sign in the frame</button>
+  <button type="button" class="sec readFullBtn">Read the whole photo instead</button>
+  <button type="button" class="sec resetFrame">Reset zoom</button>
+ </div>
+ <progress max="1" value="0"></progress>
+ <div class="ocrStatus muted"></div>
+ <textarea class="txt" placeholder="Type the sign, or use the builder below"></textarea>
+ <details class="builder"><summary class="muted">Or build a sign quickly</summary>
+  <select class="pType">
    <option value="NO PARKING">No Parking</option>
    <option value="STREET CLEANING NO PARKING">Street cleaning / alternate side (broom)</option>
    <option value="NO STANDING">No Standing</option>
@@ -66,40 +91,43 @@ label.ck{display:flex;align-items:center;gap:8px;font-size:15px;margin:6px 0}lab
    <option value="COMMERCIAL VEHICLES ONLY">Commercial Vehicles Only</option>
    <option value="METERED COMMERCIAL">Metered parking, commercial vehicles only</option>
   </select>
-  <div id="pHoursRow" style="display:none">
-   <label class="timelab" for="pHours">Hour limit</label>
-   <input id="pHours" type="number" min="1" max="12" step="1" value="3" inputmode="numeric">
+  <div class="pHoursRow" style="display:none">
+   <label class="timelab">Hour limit</label>
+   <input class="pHours" type="number" min="1" max="12" step="1" value="3" inputmode="numeric">
   </div>
-  <label class="ck"><input type="checkbox" id="pAny"> Anytime</label>
-  <div id="timeFields">
+  <label class="ck"><input type="checkbox" class="pAny"> Anytime</label>
+  <div class="timeFields">
    <div class="timelab">Start</div>
    <div class="row">
-    <select id="pFromH" aria-label="Start hour"></select>
-    <select id="pFromM" aria-label="Start minutes"></select>
-    <select id="pFromAP" aria-label="Start AM or PM"><option>AM</option><option>PM</option></select>
+    <select class="pFromH" aria-label="Start hour"></select>
+    <select class="pFromM" aria-label="Start minutes"></select>
+    <select class="pFromAP" aria-label="Start AM or PM"><option>AM</option><option>PM</option></select>
    </div>
    <div class="timelab">End</div>
    <div class="row">
-    <select id="pToH" aria-label="End hour"></select>
-    <select id="pToM" aria-label="End minutes"></select>
-    <select id="pToAP" aria-label="End AM or PM"><option>AM</option><option>PM</option></select>
+    <select class="pToH" aria-label="End hour"></select>
+    <select class="pToM" aria-label="End minutes"></select>
+    <select class="pToAP" aria-label="End AM or PM"><option>AM</option><option>PM</option></select>
    </div>
   </div>
-  <div id="timeReadout" class="muted"></div>
-  <div id="timeWarn"></div>
-  <select id="pDays">
+  <div class="timeReadout muted"></div>
+  <div class="timeWarn"></div>
+  <select class="pDays">
    <option value="">Every day</option><option>EXCEPT SUNDAY</option><option>MON-FRI</option><option>MON-SAT</option>
    <option>MON</option><option>TUES</option><option>WED</option><option>THURS</option><option>FRI</option><option>SAT</option>
    <option>MON & THURS</option><option>TUES & FRI</option>
   </select>
-  <button type="button" class="sec" id="addBtn">➕ Add this sign</button>
+  <button type="button" class="sec addBtn">➕ Add this sign</button>
  </details>
+</div>
+</template>
+<div class="card">
  <label class="ck"><input type="checkbox" id="commercial"> My vehicle has commercial plates</label>
  <button type="button" id="checkBtn">✅ Can I park here now?</button>
 </div>
 
 <div id="verdict"></div>
-<div class="card" id="parsedCard" style="display:none"><h2>How I read the sign</h2><div id="parsed"></div></div>
+<div class="card" id="parsedCard" style="display:none"><h2>How I read the signs</h2><div id="parsed"></div></div>
 
 <div class="card"><h2>Citywide rules (no sign needed)</h2>
  <ul>
@@ -145,120 +173,189 @@ $('locBtn').onclick=()=>{ if(!navigator.geolocation) return $('loc').textContent
     try{const j=await (await fetch(`https://geosearch.planninglabs.nyc/v2/reverse?point.lat=${a}&point.lon=${o}&size=1`).then(r=>r.json()).then(j=>({json:()=>({label:j.features&&j.features[0]&&j.features[0].properties.label})}))).json(); if(j.label) $('loc').innerHTML=`<b>${j.label}</b><br><span class="muted">${a.toFixed(5)}, ${o.toFixed(5)} ±${Math.round(acc)} m · <a target=_blank href="https://www.google.com/maps?q=${a},${o}">map</a></span>`;}catch(e){}
   },e=>$('loc').textContent='Location error: '+e.message,{enableHighAccuracy:true,timeout:15000});
 };
-// ---- builder ----
-function fillHours(id, selected){
-  const el=$(id); el.innerHTML='';
-  for(let h=1;h<=12;h++){ const o=document.createElement('option'); o.value=String(h); o.textContent=String(h); if(h===selected) o.selected=true; el.appendChild(o); }
+// ---- two sign slots ----
+const q=(root,sel)=>root.querySelector(sel);
+function fillSelect(el, values, selected){
+  el.innerHTML='';
+  for(const v of values){ const o=document.createElement('option'); o.value=String(v); o.textContent=String(v); if(String(v)===String(selected)) o.selected=true; el.appendChild(o); }
 }
-function fillMins(id){
-  const el=$(id); el.innerHTML='';
-  for(const m of ['00','15','30','45']){ const o=document.createElement('option'); o.value=m; o.textContent=m; el.appendChild(o); }
+function mountSign(id, title, optional){
+  const frag=document.getElementById('signTpl').content.cloneNode(true);
+  const root=frag.querySelector('.sign');
+  root.dataset.side=id;
+  root.querySelector('.signTitle').innerHTML=title;
+  root.querySelectorAll('input[type=radio]').forEach(r=>{ r.name='arrow-'+id; });
+  document.getElementById('signList').appendChild(frag);
+  const slot={id, optional:!!optional, root:document.querySelector('.sign[data-side="'+id+'"]'), builderTouched:false, sc:{}, frame:{img:null,zoom:1,panX:0,panY:0,cw:300,ch:280,dpr:1}};
+  const s=slot.root;
+  slot.txt=q(s,'.txt'); slot.status=q(s,'.ocrStatus'); slot.prog=q(s,'progress'); slot.canvas=q(s,'canvas'); slot.stage=q(s,'.stage');
+  slot.zoom=q(s,'.zoom'); slot.cropBox=q(s,'.cropBox'); slot.builder=q(s,'.builder');
+  slot.type=q(s,'.pType'); slot.hours=q(s,'.pHours'); slot.hoursRow=q(s,'.pHoursRow'); slot.any=q(s,'.pAny');
+  slot.timeFields=q(s,'.timeFields'); slot.readout=q(s,'.timeReadout'); slot.warn=q(s,'.timeWarn'); slot.days=q(s,'.pDays');
+  ['pFromH','pFromM','pFromAP','pToH','pToM','pToAP'].forEach(c=>{ slot[c]=q(s,'.'+c); });
+  fillSelect(slot.pFromH,[1,2,3,4,5,6,7,8,9,10,11,12],7);
+  fillSelect(slot.pToH,[1,2,3,4,5,6,7,8,9,10,11,12],7);
+  fillSelect(slot.pFromM,['00','15','30','45'],'00');
+  fillSelect(slot.pToM,['00','15','30','45'],'00');
+  slot.pFromAP.value='AM'; slot.pToAP.value='PM';
+  if(optional) slot.txt.placeholder='Optional. Leave empty if there is no sign behind you.';
+  slot.clock=(h,m,ap)=>{ let hh=+slot[h].value; const mi=slot[m].value; const mer=slot[ap].value; if(mer==='PM'&&hh!==12) hh+=12; if(mer==='AM'&&hh===12) hh=0; return String(hh).padStart(2,'0')+':'+mi; };
+  slot.builderOpts=()=>({type:slot.type.value, hours:slot.hours.value, anytime:slot.any.checked, from:slot.clock('pFromH','pFromM','pFromAP'), to:slot.clock('pToH','pToM','pToAP'), days:slot.days.value});
+  slot.sync=()=>{
+    const meter=slot.type.value==='METERED COMMERCIAL';
+    slot.hoursRow.style.display=meter?'block':'none';
+    slot.timeFields.style.display=slot.any.checked?'none':'block';
+    const built=NYCRules.buildSignLine(slot.builderOpts());
+    const range=slot.pFromH.value+':'+slot.pFromM.value+' '+slot.pFromAP.value+' – '+slot.pToH.value+':'+slot.pToM.value+' '+slot.pToAP.value;
+    if(built.error){ slot.warn.style.display='block'; slot.warn.textContent=built.error; slot.readout.textContent='Window: '+range+' — not used until start and end differ.'; }
+    else { slot.warn.style.display='none'; slot.warn.textContent=''; slot.readout.textContent=slot.any.checked?'In effect all day.':'Window: '+range; }
+  };
+  const mark=()=>{ slot.builderTouched=true; slot.sync(); };
+  slot.type.onchange=()=>{ if(slot.type.value==='METERED COMMERCIAL' && !slot.days.value) slot.days.value='EXCEPT SUNDAY'; mark(); };
+  [slot.pFromH,slot.pFromM,slot.pFromAP,slot.pToH,slot.pToM,slot.pToAP,slot.hours,slot.any,slot.days].forEach(el=>el.addEventListener('change',mark));
+  slot.hours.addEventListener('input',mark);
+  slot.sync();
+  slot.txt.oninput=()=>{ slot.sc={}; };
+  q(s,'.addBtn').onclick=()=>{
+    const built=NYCRules.buildSignLine(slot.builderOpts());
+    if(built.error){ showVerdict('no','<div class="big">Check the times</div><div class="line">'+slotName(slot)+': '+esc(built.error)+'</div>'); return; }
+    slot.txt.value=(slot.txt.value.trim()?slot.txt.value.trim()+'\n\n':'')+built.line;
+    slot.builderTouched=true;
+    check();
+  };
+  q(s,'.photo').onchange=e=>{
+    const f=e.target.files&&e.target.files[0]; if(!f) return;
+    const img=new Image();
+    img.onload=()=>{ slot.frame.img=img; slot.frame.zoom=1; slot.frame.panX=0; slot.frame.panY=0; slot.zoom.value='1'; slot.cropBox.style.display='block';
+      requestAnimationFrame(()=>{ sizeCanvas(slot); drawFrame(slot); });
+      slot.status.textContent='Photo loaded. Drag the sign into the blue frame and zoom in, then tap Read sign. Nothing is read until you do.';
+    };
+    img.onerror=()=>{ slot.status.textContent='Could not open that photo. Use build a sign quickly instead.'; };
+    img.src=URL.createObjectURL(f);
+  };
+  slot.zoom.oninput=()=>{ slot.frame.zoom=+(slot.zoom.value||1); drawFrame(slot); };
+  q(s,'.readBtn').onclick=()=>runOcr(slot,false);
+  q(s,'.readFullBtn').onclick=()=>runOcr(slot,true);
+  q(s,'.resetFrame').onclick=()=>{ slot.frame.zoom=1; slot.frame.panX=0; slot.frame.panY=0; slot.zoom.value='1'; drawFrame(slot); };
+  bindPointers(slot);
+  return slot;
 }
-fillHours('pFromH',7); fillHours('pToH',7); fillMins('pFromM'); fillMins('pToM'); $('pFromAP').value='AM'; $('pToAP').value='PM';
-function clockValue(hId,mId,apId){
-  let h=+$(hId).value; const mi=$(mId).value; const ap=$(apId).value;
-  if(ap==='PM'&&h!==12) h+=12; if(ap==='AM'&&h===12) h=0;
-  return String(h).padStart(2,'0')+':'+mi;
+function slotName(slot){ return slot.id==='behind'?'Sign behind the car':'Sign in front of the car'; }
+function wherePhrase(rules){
+  const names=[];
+  for(const r of rules||[]){
+    const n=r.side==='behind'?'behind the car':r.side==='front'?'in front of the car':'';
+    if(n && !names.includes(n)) names.push(n);
+  }
+  if(!names.length) return '';
+  return ' ('+names.join(' and ')+')';
 }
-function builderOpts(){
-  return {type:$('pType').value, hours:$('pHours').value, anytime:$('pAny').checked,
-    from:clockValue('pFromH','pFromM','pFromAP'), to:clockValue('pToH','pToM','pToAP'), days:$('pDays').value};
-}
-function syncBuilder(){
-  const commercialMeter=$('pType').value==='METERED COMMERCIAL';
-  $('pHoursRow').style.display=commercialMeter?'block':'none';
-  $('timeFields').style.display=$('pAny').checked?'none':'block';
-  const built=NYCRules.buildSignLine(builderOpts());
-  const range=$('pFromH').value+':'+$('pFromM').value+' '+$('pFromAP').value+' – '+$('pToH').value+':'+$('pToM').value+' '+$('pToAP').value;
-  if(built.error){ $('timeWarn').style.display='block'; $('timeWarn').textContent=built.error; $('timeReadout').textContent='Window: '+range+' — not used until start and end differ.'; }
-  else { $('timeWarn').style.display='none'; $('timeWarn').textContent=''; $('timeReadout').textContent=$('pAny').checked?'In effect all day.':'Window: '+range; }
-}
-$('pType').onchange=()=>{ if($('pType').value==='METERED COMMERCIAL' && !$('pDays').value) $('pDays').value='EXCEPT SUNDAY'; syncBuilder(); };
-['pFromH','pFromM','pFromAP','pToH','pToM','pToAP','pHours','pAny','pDays'].forEach(id=>$(id).addEventListener('change',syncBuilder));
-$('pHours').addEventListener('input',syncBuilder);
-syncBuilder();
+const slots=[
+  mountSign('front','Sign in front of my car',false),
+  mountSign('behind','Sign behind my car <small style="font-weight:400;text-transform:none;letter-spacing:0">optional</small>',true)
+];
+
+function arrowOf(slot){ const el=slot.root.querySelector('input[type=radio]:checked'); return el?el.value:'toward'; }
+function otherHasSign(slot){ return slots.some(s=>s!==slot && (s.txt.value.trim() || s.builderTouched)); }
 function showVerdict(kind, html){ const v=$('verdict'); v.style.display='block'; v.className=kind; v.innerHTML=html; v.scrollIntoView({behavior:'smooth'}); }
-function nothingParsedHtml(){
+function nothingParsedHtml(slot){
   return '<div class="big">?</div>'
-    +'<div class="line">No parking rule found in that text.</div>'
+    +'<div class="line">'+slotName(slot)+': no parking rule found in that text.</div>'
     +'<div class="line">Try a line like <b>NO PARKING 8AM-11AM TUES</b> or <b>3 HOUR METERED PARKING COMMERCIAL VEHICLES ONLY 7AM-7PM EXCEPT SUNDAY</b>.</div>'
-    +'<div class="line">Or open “build a sign quickly”, pick the sign (for the red commercial meter sign choose <b>Metered parking, commercial vehicles only</b>), then tap <b>Can I park here now?</b>. You do not need to tap Add this sign first.</div>';
+    +'<div class="line">Or open “build a sign quickly” on that sign and tap <b>Can I park here now?</b>. You do not need to tap Add this sign first.</div>';
 }
 function renderParsed(rules){
   $('parsedCard').style.display='block';
-  $('parsed').innerHTML=rules.map((x,i)=>`<div class="pill">${esc(NYCRules.describe(x))}</div>`+(x.type==='NO_PARKING'&&!x.anytime?` <label class="ck"><input type="checkbox" data-i="${i}" ${x.streetCleaning?'checked':''}> Broom / street cleaning sign (suspended on ASP holidays)${x.guessedSC?' <span class="muted">(guessed)</span>':''}</label>`:'')+x.notes.map(n=>`<div class="muted">${esc(n)}</div>`).join('')).join('');
-  $('parsed').querySelectorAll('input[data-i]').forEach(cb=>cb.onchange=()=>{ window._sc=window._sc||{}; window._sc[cb.dataset.i]=cb.checked; check(); });
+  $('parsed').innerHTML=rules.map(x=>`<div class="pill">${esc((x.side==='behind'?'Behind: ':x.side==='front'?'In front: ':'')+NYCRules.describe(x))}</div>`+(x.type==='NO_PARKING'&&!x.anytime?` <label class="ck"><input type="checkbox" data-side="${x.side||''}" data-i="${x.slotIndex}" ${x.streetCleaning?'checked':''}> Broom / street cleaning sign (suspended on ASP holidays)${x.guessedSC?' <span class="muted">(guessed)</span>':''}</label>`:'')+(x.notes||[]).map(n=>`<div class="muted">${esc(n)}</div>`).join('')).join('');
+  $('parsed').querySelectorAll('input[data-i]').forEach(cb=>cb.onchange=()=>{ const slot=slots.find(s=>s.id===cb.dataset.side); if(!slot) return; slot.sc[cb.dataset.i]=cb.checked; check(); });
 }
-$('addBtn').onclick=()=>{
-  const built=NYCRules.buildSignLine(builderOpts());
-  if(built.error){ showVerdict('no','<div class="big">Check the times</div><div class="line">'+esc(built.error)+'</div>'); return; }
-  $('txt').value=($('txt').value.trim()?$('txt').value.trim()+'\n\n':'')+built.line;
-  check();
-};
-// ---- evaluate ----
-function check(){
-  let text=$('txt').value.trim(); let fromBuilder=false;
+function resolveSlot(slot){
+  const arrow=arrowOf(slot);
+  let text=slot.txt.value.trim();
+  let fromBuilder=false;
   if(!text){
-    const built=NYCRules.buildSignLine(builderOpts());
-    if(built.error){ showVerdict('no','<div class="big">Check the times</div><div class="line">'+esc(built.error)+'</div><div class="line">The sign text box is empty, so Check uses the builder. Start and end cannot be the same.</div>'); $('builder').open=true; return; }
-    text=built.line; $('txt').value=text; fromBuilder=true; $('builder').open=true;
+    if(slot.optional && !slot.builderTouched) return {skip:true};
+    if(!slot.optional && !slot.builderTouched && otherHasSign(slot)) return {skip:true};
+    if(arrow==='away' && !slot.builderTouched) return {skip:true};
+    const built=NYCRules.buildSignLine(slot.builderOpts());
+    if(arrow==='away') return built.error ? {skip:true} : {ignored:true, fromBuilder:false};
+    if(built.error) return {error:built.error};
+    text=built.line; slot.txt.value=text; fromBuilder=true; slot.builder.open=true;
   }
-  const {rules}=NYCRules.parse(text); const v=$('verdict'); v.style.display='block';
-  if(!rules.length){ v.className='no'; v.innerHTML=nothingParsedHtml(); $('parsedCard').style.display='none'; return; }
-  if(rules.every(r=>r.badWindow)){ v.className='no'; v.innerHTML='<div class="big">Check the times</div><div class="line">'+esc(rules.map(r=>r.notes.join(' ')).join(' '))+'</div>'; renderParsed(rules); return; }
-  const usable=rules.filter(r=>!r.badWindow);
-  const now=new Date(); const r=NYCRules.evaluate(usable,now,ASP.holidays,{commercial:$('commercial').checked}); const F=NYCRules.fmt,D=NYCRules.dur;
+  if(arrow==='away') return {ignored:true};
+  const parsed=NYCRules.parse(text);
+  parsed.rules.forEach((r,i)=>{ if(slot.sc && i in slot.sc) r.streetCleaning=slot.sc[i]; r.side=slot.id; r.slotIndex=i; });
+  if(!parsed.rules.length) return {error:'noparse'};
+  if(parsed.rules.every(r=>r.badWindow)) return {error:'bad', rules:parsed.rules};
+  return {rules:parsed.rules.filter(r=>!r.badWindow), shown:parsed.rules, fromBuilder};
+}
+function check(){
+  const sides=[]; const shown=[]; const notes=[]; const problems=[]; const usedBuilder=[];
+  for(const slot of slots){
+    const got=resolveSlot(slot);
+    if(got.skip) continue;
+    if(got.ignored){ sides.push({id:slot.id, arrow:'away', rules:[]}); continue; }
+    if(got.error==='noparse'){ problems.push(nothingParsedHtml(slot)); continue; }
+    if(got.error==='bad'){ problems.push('<div class="big">Check the times</div><div class="line">'+slotName(slot)+': '+esc((got.rules||[]).map(r=>r.notes.join(' ')).join(' '))+'</div>'); shown.push(...(got.rules||[])); continue; }
+    if(got.error){ problems.push('<div class="big">Check the times</div><div class="line">'+slotName(slot)+': '+esc(got.error)+'</div>'); continue; }
+    sides.push({id:slot.id, arrow:arrowOf(slot), rules:got.rules});
+    shown.push(...(got.shown||got.rules));
+    if(got.fromBuilder) usedBuilder.push(slot);
+  }
+  if(problems.length){ showVerdict('no', problems.join('')); if(shown.length) renderParsed(shown); else $('parsedCard').style.display='none'; return; }
+  if(!sides.length){ showVerdict('no','<div class="big">?</div><div class="line">Add a sign in front of the car, or set its arrow to point toward the car.</div>'); $('parsedCard').style.display='none'; return; }
+  const now=new Date();
+  const r=NYCRules.evaluateSides(sides, now, ASP.holidays, {commercial:$('commercial').checked});
+  const F=NYCRules.fmt, D=NYCRules.dur;
   let h='';
+  const v=$('verdict'); v.style.display='block';
   if(r.canPark){ v.className='ok'; h+='<div class="big">✅ CAN PARK NOW</div>';
-    if(r.limit) h+=`<div class="line">⏱ ${r.limit.minutes/60} hour max${r.limit.metered?' · pay the meter / ParkNYC':''}.</div>`;
-    if(r.nextViolation) h+=`<div class="line">${r.violationIsTimeLimit?'Time limit runs out':'Violation starts'}: <b>${F(r.nextViolation)}</b><br>(in ${D(r.nextViolation-now)}) · move before then.</div>`;
+    if(r.limit) h+=`<div class="line">⏱ ${r.limit.minutes/60} hour max${r.limit.metered?' · pay the meter / ParkNYC':''}${wherePhrase([{side:r.limit.side}])}.</div>`;
+    if(r.nextViolation) h+=`<div class="line">${r.violationIsTimeLimit?'Time limit runs out':'Violation starts'}: <b>${F(r.nextViolation)}</b>${wherePhrase(r.nextRules)}<br>(in ${D(r.nextViolation-now)}) · move before then.</div>`;
     else h+='<div class="line">No restriction found in the next 2 weeks.</div>';
-    if(r.upcomingLimit) h+=`<div class="line">Heads up: ${r.upcomingLimit.minutes/60} hr limit${r.upcomingLimit.metered?' (metered)':''} starts ${F(r.upcomingLimit.start)}.</div>`;
+    if(r.upcomingLimit) h+=`<div class="line">Heads up: ${r.upcomingLimit.minutes/60} hr limit${r.upcomingLimit.metered?' (metered)':''} starts ${F(r.upcomingLimit.start)}${wherePhrase([{side:r.upcomingLimit.side}])}.</div>`;
   } else { v.className='no'; h+='<div class="big">⛔ CANNOT PARK NOW</div>';
-    h+=`<div class="line">Restricted by: ${r.blockedBy.map(NYCRules.describe).map(esc).join('; ')}</div>`;
-    h+= r.okAt?`<div class="line">OK to park from: <b>${F(r.okAt)}</b><br>(in ${D(r.okAt-now)})</div>`:'<div class="line">Never: this restriction is in effect at all times.</div>';
-    if(r.limitAtOk) h+=`<div class="line">Then a ${r.limitAtOk.minutes/60} hr limit${r.limitAtOk.metered?' (metered)':''} applies until ${F(r.limitAtOk.windowEnd)}.</div>`;
+    h+=`<div class="line">Restricted by${wherePhrase(r.blockedBy)}: ${r.blockedBy.map(x=>esc(NYCRules.describe(x))).join('; ')}</div>`;
+    h+= r.okAt?`<div class="line">OK to park from: <b>${F(r.okAt)}</b><br>(in ${D(r.okAt-now)})${r.blockedBy.length>1?' — when every sign that applies allows it':''}</div>`:'<div class="line">Never: this restriction is in effect at all times.</div>';
+    if(r.limitAtOk) h+=`<div class="line">Then a ${r.limitAtOk.minutes/60} hr limit${r.limitAtOk.metered?' (metered)':''} applies until ${F(r.limitAtOk.windowEnd)}${wherePhrase([{side:r.limitAtOk.side}])}.</div>`;
   }
-  if(fromBuilder) h+='<div class="line" style="font-size:14px;opacity:.9">Used the sign in “build a sign quickly” because the text box was empty.</div>';
+  for(const ign of r.ignored||[]) h+=`<div class="line">The sign ${ign.id==='behind'?'behind the car':'in front of the car'} points away, so it was not used.</div>`;
+  for(const slot of usedBuilder) h+=`<div class="line" style="font-size:14px;opacity:.9">Used ${slotName(slot).toLowerCase()} from “build a sign quickly” because that text box was empty.</div>`;
   h+=`<div class="line" style="font-size:14px;opacity:.9">Checked at ${F(now)} NYC time. Also watch out for hydrants, driveways, and bus stops.</div>`;
-  v.innerHTML=h; renderParsed(rules);
+  v.innerHTML=h;
+  if(shown.length) renderParsed(shown); else $('parsedCard').style.display='none';
 }
-const _parse=NYCRules.parse; NYCRules.parse=t=>{const o=_parse(t); if(window._sc) o.rules.forEach((r,i)=>{if(i in window._sc) r.streetCleaning=window._sc[i];}); return o;};
-$('txt').oninput=()=>{window._sc={};};
 $('checkBtn').onclick=check;
-// ---- photo crop + OCR ----
-const frameState={img:null,zoom:1,panX:0,panY:0,cw:300,ch:320,dpr:1};
-let ocrWorker=null, ocrPass=0, ocrTotal=1;
-function sizeCanvas(){
-  const stage=$('stage'), canvas=$('cropCanvas');
-  const w=stage.clientWidth||Math.min(320, window.innerWidth-52), h=stage.clientHeight||320;
+// ---- photo crop + OCR (one framer per sign) ----
+let ocrWorker=null, ocrPass=0, ocrTotal=1, ocrSlot=null, ocrBusy=false;
+function sizeCanvas(slot){
+  const w=slot.stage.clientWidth||Math.min(320, window.innerWidth-52), h=slot.stage.clientHeight||280;
   const dpr=Math.min(window.devicePixelRatio||1, 2);
-  canvas.width=Math.round(w*dpr); canvas.height=Math.round(h*dpr);
-  frameState.cw=w; frameState.ch=h; frameState.dpr=dpr;
+  slot.canvas.width=Math.round(w*dpr); slot.canvas.height=Math.round(h*dpr);
+  slot.frame.cw=w; slot.frame.ch=h; slot.frame.dpr=dpr;
 }
-function frameRect(){ const m=0.1; return {x:frameState.cw*m, y:frameState.ch*m, w:frameState.cw*(1-2*m), h:frameState.ch*(1-2*m)}; }
-function imageRect(){
-  const img=frameState.img, fr=frameRect(), fit=Math.min(fr.w/img.width, fr.h/img.height), z=frameState.zoom;
+function frameRect(slot){ const m=0.1, f=slot.frame; return {x:f.cw*m, y:f.ch*m, w:f.cw*(1-2*m), h:f.ch*(1-2*m)}; }
+function imageRect(slot){
+  const img=slot.frame.img, fr=frameRect(slot), fit=Math.min(fr.w/img.width, fr.h/img.height), z=slot.frame.zoom;
   const dw=img.width*fit*z, dh=img.height*fit*z;
-  // Zoom 1 fits the whole photo inside the frame so a tight shot is not clipped. Zoom in to crop.
-  return {x:fr.x+(fr.w-dw)/2+frameState.panX, y:fr.y+(fr.h-dh)/2+frameState.panY, dw, dh, fit};
+  return {x:fr.x+(fr.w-dw)/2+slot.frame.panX, y:fr.y+(fr.h-dh)/2+slot.frame.panY, dw, dh, fit};
 }
-function drawFrame(){
-  if(!frameState.img) return;
-  const canvas=$('cropCanvas'), ctx=canvas.getContext('2d');
-  ctx.setTransform(frameState.dpr,0,0,frameState.dpr,0,0);
-  ctx.clearRect(0,0,frameState.cw,frameState.ch);
-  const ir=imageRect();
-  ctx.drawImage(frameState.img, ir.x, ir.y, ir.dw, ir.dh);
-  const fr=frameRect();
+function drawFrame(slot){
+  if(!slot.frame.img) return;
+  const ctx=slot.canvas.getContext('2d');
+  ctx.setTransform(slot.frame.dpr,0,0,slot.frame.dpr,0,0);
+  ctx.clearRect(0,0,slot.frame.cw,slot.frame.ch);
+  const ir=imageRect(slot);
+  ctx.drawImage(slot.frame.img, ir.x, ir.y, ir.dw, ir.dh);
+  const fr=frameRect(slot);
   ctx.fillStyle='rgba(0,0,0,.45)';
-  ctx.beginPath(); ctx.rect(0,0,frameState.cw,frameState.ch); ctx.rect(fr.x,fr.y,fr.w,fr.h); ctx.fill('evenodd');
+  ctx.beginPath(); ctx.rect(0,0,slot.frame.cw,slot.frame.ch); ctx.rect(fr.x,fr.y,fr.w,fr.h); ctx.fill('evenodd');
   ctx.strokeStyle='#60a5fa'; ctx.lineWidth=3; ctx.strokeRect(fr.x,fr.y,fr.w,fr.h);
 }
-function regionCanvas(full){
-  const img=frameState.img; let sx=0,sy=0,sw=img.width,sh=img.height;
+function regionCanvas(slot, full){
+  const img=slot.frame.img; let sx=0,sy=0,sw=img.width,sh=img.height;
   if(!full){
-    const ir=imageRect(), fr=frameRect(), scale=ir.fit*frameState.zoom;
+    const ir=imageRect(slot), fr=frameRect(slot), scale=ir.fit*slot.frame.zoom;
     sx=(fr.x-ir.x)/scale; sy=(fr.y-ir.y)/scale; sw=fr.w/scale; sh=fr.h/scale;
     if(sx<0){ sw+=sx; sx=0; } if(sy<0){ sh+=sy; sy=0; }
     if(sx+sw>img.width) sw=img.width-sx; if(sy+sh>img.height) sh=img.height-sy;
@@ -286,8 +383,6 @@ function paintPass(src, mode){
   const d=x.getImageData(0,0,c.width,c.height), p=d.data;
   if(mode==='color'){
     for(let i=0;i<p.length;i+=4){ const r=p[i],g=p[i+1],b=p[i+2]; const v=Math.min(r,g,b)<150&&(Math.max(r,g,b)-Math.min(r,g,b)>30||Math.max(r,g,b)<130)?0:255; p[i]=p[i+1]=p[i+2]=v; }
-  } else if(mode==='red'){
-    for(let i=0;i<p.length;i+=4){ const r=p[i],g=p[i+1],b=p[i+2]; const red=r>70&&r>g+20&&r>b+20; const dark=(r+g+b)/3<135; p[i]=p[i+1]=p[i+2]=(red||dark)?0:255; }
   } else {
     const gray=new Uint8Array(p.length/4); let lo=255,hi=0;
     for(let i=0,j=0;i<p.length;i+=4,j++){ const y=0.299*p[i]+0.587*p[i+1]+0.114*p[i+2]; gray[j]=y; if(y<lo)lo=y; if(y>hi)hi=y; }
@@ -314,19 +409,20 @@ function scoreText(t){
 }
 async function recognize(canvas){
   if(!ocrWorker){
-    ocrWorker=await Tesseract.createWorker('eng', 1, {logger:m=>{ if(m.status==='recognizing text') $('prog').value=(ocrPass+(m.progress||0))/ocrTotal; }});
+    ocrWorker=await Tesseract.createWorker('eng', 1, {logger:m=>{ if(m.status==='recognizing text' && ocrSlot) ocrSlot.prog.value=(ocrPass+(m.progress||0))/ocrTotal; }});
     try{ await ocrWorker.setParameters({tessedit_pageseg_mode:'6'}); }catch(e){}
   }
   const {data}=await ocrWorker.recognize(canvas);
   return NYCRules.cleanOcr(data.text);
 }
-async function runOcr(full){
-  if(!frameState.img) return;
-  if(typeof Tesseract==='undefined'){ $('ocrStatus').innerHTML='Text reading did not load. Open <b>build a sign quickly</b> and enter the sign there.'; return; }
-  $('prog').style.display='block'; $('prog').value=0;
-  $('ocrStatus').textContent=full?'Reading the whole photo…':'Reading the sign in the frame…';
+async function runOcr(slot, full){
+  if(ocrBusy || !slot.frame.img) return;
+  if(typeof Tesseract==='undefined'){ slot.status.innerHTML='Text reading did not load. Open <b>build a sign quickly</b> and enter the sign there.'; return; }
+  ocrBusy=true; ocrSlot=slot;
+  slot.prog.style.display='block'; slot.prog.value=0;
+  slot.status.textContent=full?'Reading the whole photo…':'Reading the sign in the frame…';
   try{
-    const base=regionCanvas(full);
+    const base=regionCanvas(slot, full);
     let best={text:'',score:-999};
     const passes=[()=>contrastCanvas(base), ()=>paintPass(base,'color'), ()=>paintPass(base,'otsu')];
     ocrTotal=passes.length;
@@ -337,7 +433,7 @@ async function runOcr(full){
       if(NYCRules.ocrLooksUseful(text) && score>=5) break;
     }
     if(!NYCRules.ocrLooksUseful(best.text)){
-      $('ocrStatus').textContent='Trying a couple of angles…';
+      slot.status.textContent='Trying a couple of angles…';
       const angles=[-15,15];
       ocrTotal=passes.length+angles.length;
       for(let i=0;i<angles.length;i++){
@@ -350,44 +446,31 @@ async function runOcr(full){
     const cleaned=NYCRules.cleanOcr(best.text);
     if(!NYCRules.ocrLooksUseful(cleaned)){
       const saw=cleaned?` I saw “${esc(cleaned.slice(0,140))}”, which is not a parking rule.`:'';
-      $('ocrStatus').innerHTML=`Could not read a parking rule from this photo.${saw} Zoom in until the sign fills the blue frame and try again, or open <b>build a sign quickly</b> (for a red “commercial vehicles only” meter sign, choose <b>Metered parking, commercial vehicles only</b>) and tap <b>Can I park here now?</b>.`;
+      slot.status.innerHTML=`Could not read a parking rule from this photo.${saw} Zoom in until the sign fills the blue frame and try again, or open <b>build a sign quickly</b> and tap <b>Can I park here now?</b>.`;
     } else {
-      $('txt').value=cleaned; window._sc={};
-      $('ocrStatus').innerHTML='Done. <b>Check this text against the sign</b> and fix anything wrong, then tap Can I park here now?';
+      slot.txt.value=cleaned; slot.sc={};
+      slot.status.innerHTML='Done. <b>Check this text against the sign</b> and fix anything wrong, then tap Can I park here now?';
       if(NYCRules.parse(cleaned).rules.length) check();
     }
   }catch(err){
-    $('ocrStatus').innerHTML='Could not read that photo ('+esc(err.message)+'). Open <b>build a sign quickly</b> and enter the sign there instead.';
+    slot.status.innerHTML='Could not read that photo ('+esc(err.message)+'). Open <b>build a sign quickly</b> and enter the sign there instead.';
   }
-  $('prog').style.display='none';
+  slot.prog.style.display='none';
+  ocrBusy=false; ocrSlot=null;
 }
-$('photo').onchange=e=>{
-  const f=e.target.files&&e.target.files[0]; if(!f) return;
-  const img=new Image();
-  img.onload=()=>{ frameState.img=img; frameState.zoom=1; frameState.panX=0; frameState.panY=0; $('zoom').value='1'; $('cropBox').style.display='block';
-    requestAnimationFrame(()=>{ sizeCanvas(); drawFrame(); });
-    $('ocrStatus').textContent='Photo loaded. Drag the sign into the blue frame and zoom in, then tap Read sign. Nothing is read until you do.';
-  };
-  img.onerror=()=>{ $('ocrStatus').textContent='Could not open that photo. Use build a sign quickly instead.'; };
-  img.src=URL.createObjectURL(f);
-};
-$('zoom').oninput=()=>{ frameState.zoom=+($('zoom').value||1); drawFrame(); };
-$('readBtn').onclick=()=>runOcr(false);
-$('readFullBtn').onclick=()=>runOcr(true);
-$('resetFrame').onclick=()=>{ frameState.zoom=1; frameState.panX=0; frameState.panY=0; $('zoom').value='1'; drawFrame(); };
-window.addEventListener('resize',()=>{ if(frameState.img){ sizeCanvas(); drawFrame(); } });
-(function(){
-  const canvas=$('cropCanvas'); const pts=new Map(); let pinch=null;
+function bindPointers(slot){
+  const canvas=slot.canvas; const pts=new Map(); let pinch=null;
   canvas.addEventListener('pointerdown',e=>{ canvas.setPointerCapture(e.pointerId); pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(pts.size===2){ const [a,b]=[...pts.values()]; pinch={dist:Math.hypot(a.x-b.x,a.y-b.y)||1, zoom:frameState.zoom}; }
+    if(pts.size===2){ const [a,b]=[...pts.values()]; pinch={dist:Math.hypot(a.x-b.x,a.y-b.y)||1, zoom:slot.frame.zoom}; }
   });
   canvas.addEventListener('pointermove',e=>{
     if(!pts.has(e.pointerId)) return; const prev=pts.get(e.pointerId); pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(pts.size>=2 && pinch){ const [a,b]=[...pts.values()]; const dist=Math.hypot(a.x-b.x,a.y-b.y)||1; frameState.zoom=Math.min(6,Math.max(1,pinch.zoom*(dist/pinch.dist))); $('zoom').value=String(frameState.zoom); }
-    else { frameState.panX+=e.clientX-prev.x; frameState.panY+=e.clientY-prev.y; }
-    drawFrame();
+    if(pts.size>=2 && pinch){ const [a,b]=[...pts.values()]; const dist=Math.hypot(a.x-b.x,a.y-b.y)||1; slot.frame.zoom=Math.min(6,Math.max(1,pinch.zoom*(dist/pinch.dist))); slot.zoom.value=String(slot.frame.zoom); }
+    else { slot.frame.panX+=e.clientX-prev.x; slot.frame.panY+=e.clientY-prev.y; }
+    drawFrame(slot);
   });
   const end=e=>{ pts.delete(e.pointerId); if(pts.size<2) pinch=null; };
   canvas.addEventListener('pointerup',end); canvas.addEventListener('pointercancel',end);
-})();
+}
+window.addEventListener('resize',()=>{ for(const slot of slots) if(slot.frame.img){ sizeCanvas(slot); drawFrame(slot); } });
 </script></body></html>

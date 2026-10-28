@@ -177,3 +177,86 @@ test('ocr usefulness check rejects blank and junk', () => {
   assert.equal(NYC.ocrLooksUseful('3 HOUR METERED PARKING\nCOMMERCIAL VEHICLES ONLY'), true);
   assert.equal(NYC.cleanOcr('3 hour  metered!!'), '3 HOUR METERED');
 });
+
+function side(id, text, arrow) {
+  return { id, arrow: arrow || 'toward', rules: text ? NYC.parse(text).rules : [] };
+}
+
+test('front no-parking and behind meter combine, and a single sign matches', () => {
+  const front = 'NO PARKING 8AM-11AM TUES';
+  const behind = '2 HOUR METERED PARKING 9AM-7PM EXCEPT SUNDAY';
+  const tue = at(2026, 10, 27, 10, 0);
+  const both = NYC.evaluateSides([side('front', front), side('behind', behind)], tue, {}, {});
+  assert.equal(both.canPark, false);
+  assert.equal(parts(both.okAt).h, 11);
+  assert.equal(parts(both.okAt).d, 27);
+  assert.ok(both.blockedBy.some(r => r.side === 'front'));
+  assert.equal(both.limitAtOk.minutes, 120);
+  assert.equal(both.limitAtOk.metered, true);
+  assert.equal(both.limitAtOk.side, 'behind');
+  const wed = NYC.evaluateSides([side('front', front), side('behind', behind)], at(2026, 10, 28, 10, 0), {}, {});
+  assert.equal(wed.canPark, true);
+  assert.equal(wed.limit.minutes, 120);
+  assert.equal(wed.limit.metered, true);
+  assert.equal(wed.violationIsTimeLimit, true);
+  assert.equal(parts(wed.nextViolation).h, 12);
+  assert.equal(wed.nextRules[0].side, 'behind');
+  const only = NYC.evaluate(NYC.parse(SIGN).rules, at(2026, 10, 28, 10, 0), {}, { commercial: false });
+  const wrapped = NYC.evaluateSides([side('front', SIGN)], at(2026, 10, 28, 10, 0), {}, { commercial: false });
+  assert.equal(only.canPark, wrapped.canPark);
+  assert.equal(only.okAt.getTime(), wrapped.okAt.getTime());
+});
+
+test('a sign pointing away is ignored', () => {
+  const tue = at(2026, 10, 27, 10, 0);
+  const res = NYC.evaluateSides([
+    side('front', 'NO PARKING 8AM-11AM TUES', 'toward'),
+    side('behind', 'NO PARKING 8AM-6PM', 'away')
+  ], tue, {}, {});
+  assert.equal(res.canPark, false);
+  assert.equal(parts(res.okAt).h, 11);
+  assert.deepEqual(res.ignored.map(s => s.id), ['behind']);
+  assert.ok(res.blockedBy.every(r => r.side === 'front'));
+  const bothWays = NYC.evaluateSides([side('front', 'NO PARKING 8AM-11AM TUES', 'both')], tue, {}, {});
+  assert.equal(bothWays.canPark, false);
+  assert.equal(parts(bothWays.okAt).h, 11);
+});
+
+test('when both signs forbid parking, OK is when every sign allows it', () => {
+  const res = NYC.evaluateSides([
+    side('front', 'NO PARKING 8AM-11AM'),
+    side('behind', 'NO PARKING 9AM-6PM')
+  ], at(2026, 10, 28, 10, 0), {}, {});
+  assert.equal(res.canPark, false);
+  assert.equal(parts(res.okAt).h, 18);
+  assert.equal(parts(res.okAt).min, 0);
+  assert.deepEqual(res.blockedBy.map(r => r.side).sort(), ['behind', 'front']);
+});
+
+test('the shorter time limit applies, and ASP still suspends only street cleaning', () => {
+  const limits = NYC.evaluateSides([
+    side('front', '2 HOUR METERED PARKING 9AM-7PM'),
+    side('behind', '1 HOUR PARKING 8AM-6PM')
+  ], at(2026, 10, 28, 10, 0), {}, {});
+  assert.equal(limits.canPark, true);
+  assert.equal(limits.limit.minutes, 60);
+  assert.equal(limits.limit.metered, false);
+  assert.equal(limits.violationIsTimeLimit, true);
+  assert.equal(parts(limits.nextViolation).h, 11);
+  assert.equal(limits.nextRules[0].side, 'behind');
+  const hol = { '2026-10-28': { asp: true, meters: false, name: 'test' } };
+  const asp = NYC.evaluateSides([
+    side('front', 'STREET CLEANING NO PARKING 8AM-11AM'),
+    side('behind', 'NO STANDING 8AM-6PM')
+  ], at(2026, 10, 28, 9, 0), hol, {});
+  assert.equal(asp.canPark, false);
+  assert.ok(asp.blockedBy.every(r => r.side === 'behind'));
+  assert.equal(parts(asp.okAt).h, 18);
+  const commercial = NYC.evaluateSides([
+    side('front', SIGN),
+    side('behind', 'NO PARKING 8AM-11AM')
+  ], at(2026, 10, 28, 10, 0), {}, { commercial: true });
+  assert.equal(commercial.canPark, false);
+  assert.ok(commercial.blockedBy.every(r => r.side === 'behind'));
+  assert.equal(parts(commercial.okAt).h, 11);
+});

@@ -205,22 +205,51 @@
     const res={now, rules};
     if(cur){
       res.canPark=false; res.okAt=cur.end; res.blockedBy=cur.rules;
-      // if okAt falls inside a time-limit window, report the limit
-      const lim=limits.find(x=>x.start<=cur.end&&cur.end<x.end); if(lim){ res.limitAtOk={minutes:lim.rule.limitMin, metered:lim.rule.metered, windowEnd:lim.end}; }
+      // Shortest limit still in effect when parking becomes allowed.
+      const limCover=limits.filter(x=>x.start<=cur.end&&cur.end<x.end)
+        .sort((a,b)=>a.rule.limitMin-b.rule.limitMin || (a.rule.metered?0:1)-(b.rule.metered?0:1));
+      if(limCover.length){ const lim=limCover[0]; res.limitAtOk={minutes:lim.rule.limitMin, metered:!!lim.rule.metered, windowEnd:lim.end, side:lim.rule.side||null}; }
       if(cur.end-now>7*864e5) res.okAt=null; // anytime
       return res;
     }
     res.canPark=true;
     const next=merged.find(x=>x.start>now); res.nextViolation=next?next.start:null; res.nextRules=next?next.rules:[];
-    const lim=limits.find(x=>x.start<=now&&now<x.end);
-    if(lim){
-      const mustLeave=new Date(Math.min(now.getTime()+lim.rule.limitMin*60000, lim.end.getTime()));
-      res.limit={minutes:lim.rule.limitMin, metered:lim.rule.metered, windowEnd:lim.end};
-      if(lim.end.getTime() > now.getTime()+lim.rule.limitMin*60000 && (!res.nextViolation||mustLeave<res.nextViolation)){ res.nextViolation=mustLeave; res.nextRules=[lim.rule]; res.violationIsTimeLimit=true; }
+    const active=limits.filter(x=>x.start<=now&&now<x.end);
+    if(active.length){
+      const shortest=active.slice().sort((a,b)=>a.rule.limitMin-b.rule.limitMin || (a.rule.metered?0:1)-(b.rule.metered?0:1))[0];
+      res.limit={minutes:shortest.rule.limitMin, metered:!!shortest.rule.metered, windowEnd:shortest.end, side:shortest.rule.side||null};
+      let binding=null;
+      for(const lim of active){
+        const expires=now.getTime()+lim.rule.limitMin*60000;
+        if(lim.end.getTime()>expires){
+          const mustLeave=new Date(expires);
+          if(!binding||mustLeave<binding.mustLeave) binding={mustLeave, rule:lim.rule};
+        }
+      }
+      if(binding && (!res.nextViolation||binding.mustLeave<res.nextViolation)){
+        res.nextViolation=binding.mustLeave; res.nextRules=[binding.rule]; res.violationIsTimeLimit=true;
+      }
     } else {
-      const nl=limits.find(x=>x.start>now);
-      if(nl) res.upcomingLimit={start:nl.start, minutes:nl.rule.limitMin, metered:nl.rule.metered};
+      const upcoming=limits.filter(x=>x.start>now).sort((a,b)=>a.start-b.start || a.rule.limitMin-b.rule.limitMin);
+      if(upcoming.length){ const nl=upcoming[0]; res.upcomingLimit={start:nl.start, minutes:nl.rule.limitMin, metered:!!nl.rule.metered, side:nl.rule.side||null}; }
     }
+    return res;
+  }
+
+  // sides: [{id:'front'|'behind', arrow:'toward'|'away'|'both', rules:[...]}]
+  // Arrows pointing away from the car do not apply. Every other sign is combined;
+  // the strictest restriction wins, and OK-at is when all of them allow parking.
+  function evaluateSides(sides, now, holidays, opts={}){
+    const ignored=[]; const rules=[];
+    for(const side of sides||[]){
+      const arrow=side.arrow||'toward';
+      if(arrow==='away'){ ignored.push({id:side.id, label:side.label||side.id}); continue; }
+      const list=(side.rules||[]).filter(r=>r && !r.badWindow);
+      if(!list.length) continue;
+      for(const r of list) rules.push(Object.assign({}, r, {side:side.id||null}));
+    }
+    const res=evaluate(rules, now, holidays, opts);
+    res.ignored=ignored;
     return res;
   }
 
@@ -234,6 +263,6 @@
   }
   function hm(m){ m%=1440; const h=Math.floor(m/60), mi=m%60; const ap=h<12?'AM':'PM'; const hh=h%12||12; return mi?`${hh}:${String(mi).padStart(2,'0')}${ap}`:`${hh}${ap}`; }
 
-  const api={parse,evaluate,describe,fmt,dur,nyParts,nyToDate,ymd,TZ,buildSignLine,cleanOcr,ocrLooksUseful,DEFAULT_FROM:'07:00',DEFAULT_TO:'19:00'};
+  const api={parse,evaluate,evaluateSides,describe,fmt,dur,nyParts,nyToDate,ymd,TZ,buildSignLine,cleanOcr,ocrLooksUseful,DEFAULT_FROM:'07:00',DEFAULT_TO:'19:00'};
   if(typeof module!=='undefined') module.exports=api; else root.NYCRules=api;
 })(this);
