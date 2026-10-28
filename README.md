@@ -1,6 +1,6 @@
-# NYC Parking Check (proof of concept)
+# ParkHero
 
-Phone-friendly web app: share your location, snap a photo of a NYC parking sign (or type or pick the sign), and see whether you can park there **right now**. It tells you when the next violation starts, or when parking becomes OK.
+NYC parking sign checker. Phone-friendly web app: share your location, snap a photo of a NYC parking sign (or type or pick the sign), and see whether you can park there **right now**. It tells you when the next violation starts, or when parking becomes OK.
 
 - Sign reading: on-device OCR (tesseract.js). Always check the text against the sign.
 - Alternate Side Parking holidays: official NYC DOT 2026 suspension calendar (`asp.json`).

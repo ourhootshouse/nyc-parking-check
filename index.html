@@ -1,6 +1,11 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Can I Park Here? NYC</title>
+<title>ParkHero</title>
+<meta name="apple-mobile-web-app-title" content="ParkHero">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#111111">
+<link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
 :root{--g:#0a7d32;--r:#c62828;--b:#1d4ed8}
@@ -38,7 +43,7 @@ label.ck{display:flex;align-items:center;gap:8px;font-size:15px;margin:6px 0}lab
 .find-item{border-top:1px solid #eee;padding:8px 0;font-size:15px}
 .find-item button{display:inline-block;width:auto;padding:8px 10px;font-size:14px;margin:4px 6px 0 0}
 </style></head><body>
-<header>🚗 Can I Park Here? <small>NYC sign checker · proof of concept</small></header>
+<header>ParkHero <small>NYC parking sign checker</small></header>
 <main>
 <div class="card"><h2>1 · Location</h2>
  <button id="locBtn">📍 Use my location</button>
@@ -532,7 +537,7 @@ async function onShare(){
   if(!lastCheck){ $('shareStatus').textContent='Check the signs first, then share.'; return; }
   const url=shareUrl();
   const text=NYCSigns.shareSummary({verdictLine:lastCheck.verdictLine, whenLine:lastCheck.whenLine, address:place&&place.label, front:slots[0].txt.value.trim(), frontArrow:arrowOf(slots[0]), behind:slots[1].txt.value.trim(), behindArrow:arrowOf(slots[1]), commercial:$('commercial').checked, url});
-  if(navigator.share){ try{ await navigator.share({title:'Can I park here? NYC', text, url}); $('shareStatus').textContent='Shared.'; return; }catch(e){ if(e&&e.name==='AbortError') return; } }
+  if(navigator.share){ try{ await navigator.share({title:'ParkHero', text, url}); $('shareStatus').textContent='Shared.'; return; }catch(e){ if(e&&e.name==='AbortError') return; } }
   try{ await navigator.clipboard.writeText(text); $('shareStatus').textContent='Copied the summary and link.'; }
   catch(e){ $('shareStatus').textContent=text; }
 }
@@ -555,7 +560,7 @@ function onSave(){
 }
 function onIcs(){
   if(!lastCheck||!lastCheck.whenDate){ $('shareStatus').textContent='No move-by or OK-at time to remind you about yet.'; return; }
-  const title=lastCheck.whenKind==='move'?'Move the car':'Parking may be OK';
+  const title=lastCheck.whenKind==='move'?'ParkHero: Move the car':'ParkHero: Parking may be OK';
   const body=NYCSigns.shareSummary({verdictLine:lastCheck.verdictLine, whenLine:lastCheck.whenLine, address:place&&place.label, front:slots[0].txt.value.trim(), behind:slots[1].txt.value.trim()});
   const ics=NYCSigns.icsEvent(lastCheck.whenDate, title, body);
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([ics],{type:'text/calendar'})); a.download='move-the-car.ics'; a.click();

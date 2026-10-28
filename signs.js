@@ -114,7 +114,7 @@
   function decodeState(s) { return fromB64url(s); }
 
   function shareSummary(info) {
-    const lines = ['Can I park here? NYC'];
+    const lines = ['ParkHero — NYC parking sign checker'];
     if (info.verdictLine) lines.push(info.verdictLine);
     if (info.whenLine) lines.push(info.whenLine);
     if (info.address) lines.push(info.address);
@@ -137,7 +137,7 @@
     return [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//NYC Parking Check//EN',
+      'PRODID:-//ParkHero//EN',
       'BEGIN:VEVENT',
       'DTSTART:' + icsStamp(begin),
       'DTEND:' + icsStamp(end),

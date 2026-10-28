@@ -94,6 +94,7 @@ test('share link round-trips and the calendar file has the move time', () => {
     behindArrow: state.behindArrow,
     url: 'https://example.test/#p=abc'
   });
+  assert.match(text, /^ParkHero — NYC parking sign checker/);
   assert.match(text, /CANNOT PARK NOW/);
   assert.match(text, /NO PARKING 8AM-11AM TUES/);
   assert.match(text, /2 HOUR METERED PARKING/);
