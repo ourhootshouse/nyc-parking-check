@@ -1,0 +1,160 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Can I Park Here? NYC</title>
+<style>
+:root{--g:#0a7d32;--r:#c62828;--b:#1d4ed8}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,system-ui,Segoe UI,Roboto,sans-serif;background:#f4f5f7;color:#111;font-size:17px}
+header{background:#111;color:#fff;padding:14px 16px;font-weight:700;font-size:20px}header small{display:block;font-weight:400;font-size:13px;opacity:.75}
+main{padding:12px;max-width:640px;margin:auto}
+.card{background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px #0002}
+h2{font-size:16px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em;color:#555}
+button,.btn{display:block;width:100%;padding:16px;font-size:18px;font-weight:700;border:0;border-radius:12px;background:var(--b);color:#fff;margin:6px 0;text-align:center;cursor:pointer}
+button.sec{background:#e5e7eb;color:#111}
+textarea{width:100%;min-height:110px;font-size:17px;padding:10px;border-radius:10px;border:1px solid #bbb;font-family:ui-monospace,monospace;text-transform:uppercase}
+select,input{font-size:17px;padding:10px;border-radius:10px;border:1px solid #bbb;width:100%;margin:4px 0}
+.row{display:flex;gap:8px}.row>*{flex:1}
+#verdict{border-radius:14px;padding:18px;color:#fff;display:none}
+#verdict.ok{background:var(--g)}#verdict.no{background:var(--r)}
+#verdict .big{font-size:30px;font-weight:900;margin-bottom:6px}
+#verdict .line{font-size:18px;margin:6px 0}
+.muted{color:#666;font-size:14px}.pill{display:inline-block;background:#eef;border-radius:999px;padding:3px 10px;margin:2px;font-size:14px}
+img#preview{max-width:100%;border-radius:10px;margin-top:8px;display:none}
+.asp{padding:10px;border-radius:10px;background:#fff7d6;font-size:15px}
+ul{padding-left:20px;margin:6px 0}li{margin:4px 0;font-size:15px}a{color:var(--b)}
+progress{width:100%;display:none}
+label.ck{display:flex;align-items:center;gap:8px;font-size:15px;margin:6px 0}label.ck input{width:auto}
+</style></head><body>
+<header>🚗 Can I Park Here? <small>NYC sign checker · proof of concept</small></header>
+<main>
+<div class="card"><h2>1 · Location</h2>
+ <button id="locBtn">📍 Use my location</button>
+ <div id="loc" class="muted">Not set</div>
+ <div id="aspBox" class="asp" style="margin-top:8px">Loading today's Alternate Side Parking status…</div>
+</div>
+
+<div class="card"><h2>2 · Sign photo</h2>
+ <label class="btn" for="photo">📷 Snap / upload sign</label>
+ <input id="photo" type="file" accept="image/*" capture="environment" style="display:none">
+ <img id="preview" alt="sign"><progress id="prog" max="1" value="0"></progress>
+ <div id="ocrStatus" class="muted"></div>
+</div>
+
+<div class="card"><h2>3 · Sign text (check &amp; fix)</h2>
+ <textarea id="txt" placeholder="e.g. NO PARKING 8AM-11AM TUES&#10;Put each sign on its own line or blank-line separated"></textarea>
+ <details><summary class="muted">Or build a sign quickly</summary>
+  <select id="pType">
+   <option value="NO PARKING">No Parking</option>
+   <option value="STREET CLEANING NO PARKING">Street cleaning / alternate side (broom)</option>
+   <option value="NO STANDING">No Standing</option>
+   <option value="NO STOPPING">No Stopping</option>
+   <option value="1 HOUR METERED PARKING">1 HR Metered Parking</option>
+   <option value="2 HOUR METERED PARKING">2 HR Metered Parking</option>
+   <option value="1 HOUR PARKING">1 HR Parking (no meter)</option>
+   <option value="2 HOUR PARKING">2 HR Parking (no meter)</option>
+   <option value="COMMERCIAL VEHICLES ONLY">Commercial Vehicles Only</option>
+  </select>
+  <label class="ck"><input type="checkbox" id="pAny"> Anytime</label>
+  <div class="row"><input id="pFrom" type="time" value="08:00"><input id="pTo" type="time" value="11:00"></div>
+  <select id="pDays">
+   <option value="">Every day</option><option>EXCEPT SUNDAY</option><option>MON-FRI</option><option>MON-SAT</option>
+   <option>MON</option><option>TUES</option><option>WED</option><option>THURS</option><option>FRI</option><option>SAT</option>
+   <option>MON & THURS</option><option>TUES & FRI</option>
+  </select>
+  <button class="sec" id="addBtn">➕ Add this sign</button>
+ </details>
+ <label class="ck"><input type="checkbox" id="commercial"> My vehicle has commercial plates</label>
+ <button id="checkBtn">✅ Can I park here now?</button>
+</div>
+
+<div id="verdict"></div>
+<div class="card" id="parsedCard" style="display:none"><h2>How I read the sign</h2><div id="parsed"></div></div>
+
+<div class="card"><h2>Citywide rules (no sign needed)</h2>
+ <ul>
+  <li>No parking within <b>15 ft of a fire hydrant</b> (even if unmarked).</li>
+  <li>Don't block <b>crosswalks</b>, <b>sidewalks</b>, or <b>driveways</b> (including your host's).</li>
+  <li>No standing at <b>bus stops</b>, or double parking.</li>
+  <li>Meters: pay with the <b>ParkNYC</b> app or the muni-meter; they are suspended on major legal holidays.</li>
+  <li>Street cleaning (broom) rules are suspended on ASP holidays; other signs usually still apply.</li>
+ </ul>
+ <div class="muted">Official sources:
+  <a href="https://www.nyc.gov/html/dot/html/motorist/parking.shtml" target="_blank">NYC DOT Parking</a> ·
+  <a href="https://www.nyc.gov/html/dot/html/motorist/signs.shtml" target="_blank">DOT parking sign guide</a> ·
+  <a href="https://www.nyc.gov/site/finance/vehicles/services-violation-codes.page" target="_blank">DOF violation codes</a> ·
+  <a href="https://www.nyc.gov/html/dot/html/motorist/alternate-side-parking.shtml" target="_blank">ASP calendar</a> ·
+  <a href="https://portal.311.nyc.gov/article/?kanumber=KA-01011" target="_blank">311 ASP</a> ·
+  <a href="https://www.nyc.gov/html/dot/html/motorist/parknyc.shtml" target="_blank">ParkNYC</a>
+ </div>
+ <p class="muted">⚠️ This is a helper, not a legal guarantee. Photo text reading can be wrong, so always compare it with the actual sign. When more than one sign is on a pole, the most restrictive one applies.</p>
+</div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="rules.js"></script>
+<script>
+const $=id=>document.getElementById(id); let ASP={holidays:{}};
+// ---- ASP status ----
+fetch('asp.json').then(r=>r.json()).then(j=>{ASP=j;
+  const p=NYCRules.nyParts(new Date()); const key=NYCRules.ymd(p); const h=j.holidays[key];
+  let msg='';
+  if(j.today&&j.today.status&&/SUSPEND/i.test(j.today.status+j.today.name)){ msg=`🟡 <b>ASP SUSPENDED today</b> per NYC 311: ${j.today.name} ${j.today.message||''}`; h||(ASP.holidays[key]={asp:true,meters:/meter/i.test(j.today.message)&&/not|suspend/i.test(j.today.message),name:j.today.name}); }
+  else if(h) msg=`🟡 <b>ASP SUSPENDED today</b> (${h.name})${h.meters?'. Meters are also suspended.':'. Meters stay in effect.'}`;
+  else if(p.dow===0) msg='Sunday: ASP and meters are not in effect (unless the sign says otherwise).';
+  else msg='✅ No scheduled ASP suspension today (official DOT calendar). Weather/emergency suspensions: <a target=_blank href="https://portal.311.nyc.gov/article/?kanumber=KA-01011">check 311</a>.';
+  const up=Object.entries(j.holidays).filter(([k])=>k>key).sort()[0];
+  if(up) msg+=`<br><span class="muted">Next suspension: ${new Date(up[0]+'T12:00').toDateString()} (${up[1].name})</span>`;
+  $('aspBox').innerHTML=msg;
+}).catch(()=>$('aspBox').textContent='Could not load ASP status.');
+// ---- location ----
+$('locBtn').onclick=()=>{ if(!navigator.geolocation) return $('loc').textContent='Location not supported';
+  $('loc').textContent='Locating…';
+  navigator.geolocation.getCurrentPosition(async pos=>{const {latitude:a,longitude:o,accuracy:acc}=pos.coords;
+    $('loc').innerHTML=`${a.toFixed(5)}, ${o.toFixed(5)} (±${Math.round(acc)} m)`;
+    try{const j=await (await fetch(`https://geosearch.planninglabs.nyc/v2/reverse?point.lat=${a}&point.lon=${o}&size=1`).then(r=>r.json()).then(j=>({json:()=>({label:j.features&&j.features[0]&&j.features[0].properties.label})}))).json(); if(j.label) $('loc').innerHTML=`<b>${j.label}</b><br><span class="muted">${a.toFixed(5)}, ${o.toFixed(5)} ±${Math.round(acc)} m · <a target=_blank href="https://www.google.com/maps?q=${a},${o}">map</a></span>`;}catch(e){}
+  },e=>$('loc').textContent='Location error: '+e.message,{enableHighAccuracy:true,timeout:15000});
+};
+// ---- OCR ----
+function prep(file){return new Promise(res=>{const img=new Image();img.onload=()=>{const s=Math.min(1,1800/Math.max(img.width,img.height))*1.0;const c=document.createElement('canvas');c.width=img.width*s;c.height=img.height*s;const x=c.getContext('2d');x.drawImage(img,0,0,c.width,c.height);const d=x.getImageData(0,0,c.width,c.height);const p=d.data;
+ for(let i=0;i<p.length;i+=4){ // red & green text -> dark, white -> light
+  const r=p[i],g=p[i+1],b=p[i+2]; const v=Math.min(r,g,b)<140&&(Math.max(r,g,b)-Math.min(r,g,b)>40||Math.max(r,g,b)<120)?0:255; p[i]=p[i+1]=p[i+2]=v;}
+ x.putImageData(d,0,0);res(c);};img.src=URL.createObjectURL(file);});}
+$('photo').onchange=async e=>{const f=e.target.files[0]; if(!f) return;
+  $('preview').src=URL.createObjectURL(f); $('preview').style.display='block'; $('prog').style.display='block'; $('ocrStatus').textContent='Reading sign (on-device OCR)…';
+  try{ const c=await prep(f);
+    const {data}=await Tesseract.recognize(c,'eng',{logger:m=>{if(m.status==='recognizing text'){$('prog').value=m.progress;}}});
+    let t=data.text.toUpperCase().replace(/[^A-Z0-9:&\-\n ]/g,' ').replace(/[ ]+/g,' ').split('\n').map(s=>s.trim()).filter(s=>s.length>1).join('\n');
+    $('txt').value=t; $('ocrStatus').innerHTML='Done. <b>Please check the text against the sign</b> and fix it before checking.';
+    if(/NO |PARK|STAND|STOP|HOUR/.test(t)) check();
+  }catch(err){ $('ocrStatus').textContent='OCR failed: '+err.message+' Type the sign text instead.'; }
+  $('prog').style.display='none';
+};
+// ---- manual builder ----
+function t12(v){let [h,m]=v.split(':').map(Number);const ap=h<12?'AM':'PM';h=h%12||12;return h+(m?':'+String(m).padStart(2,'0'):'')+ap;}
+$('addBtn').onclick=()=>{const any=$('pAny').checked;const line=[$('pType').value, any?'ANYTIME':t12($('pFrom').value)+'-'+t12($('pTo').value), any?'':$('pDays').value].filter(Boolean).join(' ');
+  $('txt').value=($('txt').value.trim()?$('txt').value.trim()+'\n':'')+line; check();};
+// ---- evaluate ----
+function check(){
+  const {rules}=NYCRules.parse($('txt').value); const v=$('verdict'); v.style.display='block';
+  if(!rules.length){v.className='no';v.innerHTML='<div class="big">?</div><div class="line">I could not find a parking rule in that text. Fix the text or use "build a sign".</div>';$('parsedCard').style.display='none';return;}
+  const now=new Date(); const r=NYCRules.evaluate(rules,now,ASP.holidays,{commercial:$('commercial').checked}); const F=NYCRules.fmt,D=NYCRules.dur;
+  let h='';
+  if(r.canPark){ v.className='ok'; h+='<div class="big">✅ CAN PARK NOW</div>';
+    if(r.limit) h+=`<div class="line">⏱ ${r.limit.minutes/60} hour max${r.limit.metered?' · pay the meter / ParkNYC':''}.</div>`;
+    if(r.nextViolation) h+=`<div class="line">${r.violationIsTimeLimit?'Time limit runs out':'Violation starts'}: <b>${F(r.nextViolation)}</b><br>(in ${D(r.nextViolation-now)}) · move before then.</div>`;
+    else h+='<div class="line">No restriction found in the next 2 weeks.</div>';
+    if(r.upcomingLimit) h+=`<div class="line">Heads up: ${r.upcomingLimit.minutes/60} hr limit${r.upcomingLimit.metered?' (metered)':''} starts ${F(r.upcomingLimit.start)}.</div>`;
+  } else { v.className='no'; h+='<div class="big">⛔ CANNOT PARK NOW</div>';
+    h+=`<div class="line">Restricted by: ${r.blockedBy.map(NYCRules.describe).join('; ')}</div>`;
+    h+= r.okAt?`<div class="line">OK to park from: <b>${F(r.okAt)}</b><br>(in ${D(r.okAt-now)})</div>`:'<div class="line">Never: this restriction is in effect at all times.</div>';
+    if(r.limitAtOk) h+=`<div class="line">Then a ${r.limitAtOk.minutes/60} hr limit${r.limitAtOk.metered?' (metered)':''} applies until ${F(r.limitAtOk.windowEnd)}.</div>`;
+  }
+  h+=`<div class="line" style="font-size:14px;opacity:.9">Checked at ${F(now)} NYC time. Also watch out for hydrants, driveways, and bus stops.</div>`;
+  v.innerHTML=h; $('parsedCard').style.display='block';
+  $('parsed').innerHTML=rules.map((x,i)=>`<div class="pill">${NYCRules.describe(x)}</div>`+(x.type==='NO_PARKING'&&!x.anytime?` <label class="ck"><input type="checkbox" data-i="${i}" ${x.streetCleaning?'checked':''}> Broom / street cleaning sign (suspended on ASP holidays)${x.guessedSC?' <span class="muted">(guessed)</span>':''}</label>`:'')+x.notes.map(n=>`<div class="muted">${n}</div>`).join('')).join('');
+  $('parsed').querySelectorAll('input[data-i]').forEach(cb=>cb.onchange=()=>{ window._sc=window._sc||{}; window._sc[cb.dataset.i]=cb.checked; check(); });
+  v.scrollIntoView({behavior:'smooth'});
+}
+// apply street-cleaning overrides
+const _parse=NYCRules.parse; NYCRules.parse=t=>{const o=_parse(t); if(window._sc) o.rules.forEach((r,i)=>{if(i in window._sc) r.streetCleaning=window._sc[i];}); return o;};
+$('txt').oninput=()=>{window._sc={};};
+$('checkBtn').onclick=check;
+</script></body></html>
