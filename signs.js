@@ -321,10 +321,77 @@
     // Only mention vehicle type when a sign that applied treats commercial plates differently.
     if (vehicleMatters(i.rules)) detail = (detail ? detail + ' ' : '') + (i.commercial ? '(For commercial plates.)' : '(For a passenger car.)');
     if (detail) lines.push(detail);
+    if (i.outsideNYC) lines.unshift('⚠️ ' + NYC_RULES_WARNING + ' (this spot looks to be outside New York City).');
     let out = lines.join('\n');
     if (i.url && i.linkInText) out += '\n\nCheck it in ParkHero: ' + i.url;
     return out;
   }
+
+  // ---- Is this spot in New York City? ----
+  // Five-borough boundary, water areas included, so piers, bridges and the rivers out to the state line count.
+  // Source: NYC DCP "Borough Boundaries (water areas included)" (NYC Open Data wh2p-dxnf), simplified to about 40 m.
+  // Each ring is lon,lat x 1e4: the first point, then deltas.
+  const NYC_AREA = {
+    'Staten Island': ['-740558,406497,-8,-224,152,-242,69,-268,-19,-253,-58,-417,-565,-103,-1294,-216,-252,100,-54,96,7,108,-5,3,37,72,87,57,-41,186,-4,23,32,73,157,93,133,-15,31,32,63,164,18,113,77,96,1,27,-44,58,7,81,12,45,-18,56,15,67,50,48,10,20,106,83,40,5,385,-45,102,17,73,3,156,40,163,2,69,34,310,3'],
+    'Brooklyn': ['-739272,407253,45,-88,-16,-9,3,-16,18,-11,15,-24,-12,-11,101,-60,-11,-10,22,-14,-11,-11,75,-42,-15,-16,44,-25,-5,-5,15,-29,-8,-3,47,-56,23,30,16,-18,24,15,6,-8,51,25,50,44,55,31,51,9,5,-4,24,-128,19,5,8,-33,10,1,19,-79,28,4,19,-78,-27,-4,8,-34,-56,-18,71,-91,11,-61,67,4,153,-152,-15,-211,-154,-185,-36,-21,-257,-119,-113,-20,-134,-11,-1325,-206,19,253,-69,268,-152,242,8,246,70,97,142,233,153,-53,113,67,21,-1,25,34,4,8,20,-3,-10,17,10,23,63,93,-1,8,21,13,61,-5,32,6,25,-2,0,5,16,-1,38,17,27,19,25,-21,7,3,-3,37,6,-2,8,17,12,42,22,22,-1,11,7,-3,15,20,13,29,7,38,-15,81,54,24,20,2,25,-2,58,-18,46,-17,25,-42,22,-17,83,-20'],
+    'Queens': ['-737790,408117,153,-179,66,-41,63,-68,492,-304,16,-132,-77,-115,-92,-14,-134,-42,34,-122,13,-304,-20,-54,-7,-112,27,-63,4,-47,-53,-17,-46,-6,-63,-28,-7,-54,7,-10,-9,-4,28,-44,-5,-6,-27,-1,15,26,-21,4,-27,-28,-215,-86,-13,-23,12,-28,9,-65,15,-1,52,-36,53,-9,67,19,11,-7,11,4,24,-45,50,-44,0,-72,10,-28,-71,-2,-33,-14,-74,-59,-29,-301,-107,-217,-150,-13,-419,-94,-289,-110,-150,-93,-71,-16,-99,-114,-633,357,-923,-162,58,417,1325,206,134,11,113,20,293,140,154,185,9,167,6,44,-153,152,-67,-4,-11,61,-71,91,56,18,-8,34,27,4,-19,78,-28,-4,-19,79,-10,-1,-8,33,-19,-5,-24,128,-5,4,-51,-9,-55,-31,-50,-44,-51,-25,-6,8,-24,-15,-16,18,-23,-30,-47,56,8,3,-15,29,5,5,-44,25,15,16,-75,42,11,11,-22,14,11,10,-101,60,12,11,-15,24,-18,11,-3,16,16,9,-51,100,-13,12,-84,21,-22,17,-25,42,-46,17,-58,18,-25,2,-20,-2,-54,-24,-1,22,14,14,-7,4,5,20,44,61,57,57,100,123,60,36,3,12,-25,8,-3,11,14,33,26,12,20,-2,19,-17,13,4,114,76,46,52,24,11,-5,26,-17,30,216,-59,25,-32,100,-16,48,4,27,21,6,30,72,68,99,24,177,21,180,36,61,-4,176,-50,58,0,32,22'],
+    'Manhattan': ['-740439,406902,4,-5,9,3,-18,-15,-24,15,-7,-4,3,11,12,4', '-740400,407009,23,-16,-5,-9,-11,-3,-19,14,-5,-4,18,-14,-18,-12,-20,15', '-739259,408793,32,-4,29,-25,20,-7,20,0,43,33,12,0,33,-21,3,-11,-10,-30,-12,-6,-10,-43,-111,-126,-58,-80,-62,-116,-6,-29,12,-132,-5,-95,6,-17,36,-43,14,-6,-3,-8,47,-3,27,-28,78,-35,17,-30,5,-26,-24,-11,-46,-52,-114,-76,-13,-4,-19,17,-20,2,-26,-12,-14,-33,3,-11,25,-8,-3,-12,-60,-36,-100,-123,-57,-57,-46,-70,-3,-11,7,-4,-14,-14,3,-59,13,-44,-7,-38,-13,-29,-15,-20,-7,3,1,-11,-22,-22,-12,-42,-8,-17,-6,2,3,-37,-7,-3,-25,21,-27,-19,-38,-17,-16,1,0,-5,-25,2,-32,-6,-61,5,-21,-13,1,-8,-63,-93,-10,-23,10,-17,-20,3,-29,-42,-21,1,-113,-67,-153,53,84,149,47,278,75,293,507,702,104,250,191,302'],
+    'Bronx': ['-738648,409020,53,-15,6,12,-7,7,14,-1,11,13,-1,17,12,0,-8,9,26,8,5,8,-10,2,1,9,16,15,7,-5,12,5,-24,-29,26,-9,7,9,54,-20,-1,-13,35,0,22,-48,-4,-21,12,-32,159,-47,-9,5,5,13,450,-121,327,-76,-92,-149,-207,-257,-39,-192,-57,-91,-32,-22,-58,0,-176,50,-61,4,-180,-36,-177,-21,-99,-24,-72,-68,-6,-30,-26,-21,-49,-4,-100,16,-20,29,-18,4,-203,58,-78,35,-27,28,-47,3,0,13,-11,1,-38,47,1,108,-12,132,6,29,62,116,58,80,111,126,10,43,12,6,10,30,-3,11,-33,21,-12,0,-43,-33,-20,0,-20,7,-30,25,-21,0,-89,34,43,74,112,280']
+  };
+  const NYC_BOX = { s: 40.476, n: 40.918, w: -74.26, e: -73.70 };
+  let nycRings = null;
+  function nycAreaRings() {
+    if (nycRings) return nycRings;
+    nycRings = [];
+    for (const name of Object.keys(NYC_AREA)) for (const s of NYC_AREA[name]) {
+      const n = s.split(',').map(Number), ring = [];
+      let x = n[0], y = n[1]; ring.push([x / 1e4, y / 1e4]);
+      for (let i = 2; i < n.length; i += 2) { x += n[i]; y += n[i + 1]; ring.push([x / 1e4, y / 1e4]); }
+      nycRings.push({ name, ring });
+    }
+    return nycRings;
+  }
+  function inRing(lon, lat, ring) {
+    let c = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [x1, y1] = ring[i], [x2, y2] = ring[j];
+      if ((y1 > lat) !== (y2 > lat) && lon < (x2 - x1) * (lat - y1) / (y2 - y1) + x1) c = !c;
+    }
+    return c;
+  }
+  // Borough name for a point, or null when it is outside the five boroughs.
+  function nycBorough(lat, lon) {
+    lat = Number(lat); lon = Number(lon);
+    if (!isFinite(lat) || !isFinite(lon)) return null;
+    if (lat < NYC_BOX.s || lat > NYC_BOX.n || lon < NYC_BOX.w || lon > NYC_BOX.e) return null;
+    for (const r of nycAreaRings()) if (inRing(lon, lat, r.ring)) return r.name;
+    return null;
+  }
+  // 'nyc' | 'outside' | 'unknown' (no coordinates: still allowed, with an "NYC rules only" note)
+  function nycScope(lat, lon) {
+    if (lat == null || lon == null || lat === '' || lon === '' || !isFinite(lat) || !isFinite(lon)) return 'unknown';
+    return nycBorough(lat, lon) ? 'nyc' : 'outside';
+  }
+  const US_STATES = { AL: 1, AK: 1, AZ: 1, AR: 1, CA: 1, CO: 1, CT: 1, DE: 1, DC: 1, FL: 1, GA: 1, HI: 1, ID: 1, IL: 1, IN: 1, IA: 1, KS: 1, KY: 1, LA: 1, ME: 1, MD: 1, MA: 1, MI: 1, MN: 1, MS: 1, MO: 1, MT: 1, NE: 1, NV: 1, NH: 1, NJ: 1, NM: 1, NY: 1, NC: 1, ND: 1, OH: 1, OK: 1, OR: 1, PA: 1, RI: 1, SC: 1, SD: 1, TN: 1, TX: 1, UT: 1, VT: 1, VA: 1, WA: 1, WV: 1, WI: 1, WY: 1, PR: 1 };
+  // "Washington, DC", "Jersey City, NJ", "Toronto, Canada" from a Nominatim reverse result; null if nothing usable.
+  function placeNameFrom(j) {
+    const a = j && j.address; if (!a) return null;
+    const town = a.city || a.town || a.village || a.hamlet || a.municipality || a.suburb || a.county || '';
+    const iso = String(a['ISO3166-2-lvl4'] || '');
+    let region = '';
+    if (a.country_code === 'us') { const st = iso.replace(/^US-/, ''); region = US_STATES[st] ? st : (a.state || ''); }
+    else region = a.country || a.state || '';
+    const name = [town, region].filter(Boolean).filter((x, i, arr) => arr.indexOf(x) === i).join(', ');
+    return name ? name.slice(0, 60) : null;
+  }
+  // The neutral card shown instead of a verdict outside the five boroughs.
+  function outsideText(name) {
+    return {
+      title: 'ParkHero only covers New York City',
+      line: (name ? 'You look to be in ' + name + '. ' : 'You look to be outside NYC. ') + 'Rules here differ, so check the posted signs and local rules.'
+    };
+  }
+  const NYC_RULES_WARNING = 'NYC rules, may not apply here';
 
   // ---- garage referral links (SpotHero / ParkWhiz) ----
   // Wall-clock parts of a Date in New York, plus that moment's UTC offset in minutes.
@@ -394,6 +461,7 @@
     sh.set('kind', 'address');
     if (!generic) { sh.set('latitude', String(lat)); sh.set('longitude', String(lon)); }
     if (addr) sh.set('search_string', addr.replace(/, NYC$/, ', New York') + ', NY');
+    else if (i.area && !generic) sh.set('search_string', String(i.area));
     else if (generic) sh.set('search_string', 'New York, NY');
     sh.set('starts', nyLocalMinute(win.start));
     sh.set('ends', nyLocalMinute(win.end));
@@ -404,7 +472,7 @@
     pw.set('start', nyIsoOffset(win.start));
     pw.set('end', nyIsoOffset(win.end));
     if (String(aff.parkwhiz || '').trim()) pw.set('pwa', String(aff.parkwhiz).trim());
-    const parkwhiz = 'https://www.parkwhiz.com/destination/' + (generic ? 'New-York-NY' : slugTitle(i.address)) + '/?' + pw.toString();
+    const parkwhiz = 'https://www.parkwhiz.com/destination/' + (generic ? 'New-York-NY' : !addr && i.area ? (String(i.area).replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'Parking') : slugTitle(i.address)) + '/?' + pw.toString();
     return { spothero, parkwhiz, generic, start: win.start, end: win.end, endKnown: win.known, legalAt: win.known ? new Date(i.legalAt) : null };
   }
 
@@ -474,9 +542,11 @@
       v: 1, id: String(i.id || new Date(i.parkedAt || Date.now()).getTime()),
       parkedAt: new Date(i.parkedAt || Date.now()).toISOString(),
       lat: num(i.lat), lon: num(i.lon), acc: num(i.acc), address: String(i.address || ''),
-      sides, commercial: !!i.commercial, verdict: String(i.verdict || '')
+      sides, commercial: !!i.commercial, verdict: String(i.verdict || ''), outside: !!i.outside
     };
   }
+  // Outside NYC the saved "address" is just a place name ("Washington, DC"); don't NYC-ify it.
+  function carPlace(car) { return car && car.address ? (car.outside ? String(car.address) : tidyAddress(car.address)) : ''; }
   function carHasRules(car) { return !!(car && (car.sides || []).some(s => s.arrow !== 'away' && (s.rules || []).length)); }
   // Where the car stands at `now`. Walks forward from the moment it was parked, so a time limit counts from parking time
   // and a window that already came and went is accounted for. engine = NYCRules.
@@ -578,7 +648,7 @@
   // Walking directions: Apple Maps on iOS, Google Maps elsewhere. Falls back to the address when there are no coordinates.
   function directionsUrl(car, ios) {
     const has = car && car.lat != null && car.lon != null && isFinite(car.lat) && isFinite(car.lon);
-    const addr = car && car.address ? tidyAddress(car.address).replace(/, NYC$/, ', New York, NY') : '';
+    const addr = car && car.address ? carPlace(car).replace(/, NYC$/, ', New York, NY') : '';
     if (!has && !addr) return null;
     const dest = has ? round5(car.lat) + ',' + round5(car.lon) : addr;
     return ios ? 'https://maps.apple.com/?daddr=' + encodeURIComponent(dest).replace(/%2C/g, ',') + '&dirflg=w'
@@ -587,12 +657,13 @@
   function carMapLink(car) {
     const has = car && car.lat != null && car.lon != null && isFinite(car.lat) && isFinite(car.lon);
     if (has) return 'https://maps.google.com/?q=' + round5(car.lat) + ',' + round5(car.lon);
-    return car && car.address ? 'https://maps.google.com/?q=' + encodeURIComponent(tidyAddress(car.address)) : null;
+    return car && car.address ? 'https://maps.google.com/?q=' + encodeURIComponent(carPlace(car)) : null;
   }
   function carShareText(car, status, now) {
     const v = carView(status, now);
-    const where = car && car.address ? tidyAddress(car.address) : '';
+    const where = car && car.address ? carPlace(car) : '';
     const lines = ['🚗 My car' + (where ? ' is at ' + where : '')];
+    if (car && car.outside) lines.push('⚠️ ' + NYC_RULES_WARNING + ' (outside New York City)');
     if (status && status.state === 'ok') lines.push('⏰ ' + v.title + ' (' + v.detail + ')');
     else lines.push('⏰ ' + v.title);
     lines.push('🅿️ Parked at ' + pastText(car.parkedAt, now));
@@ -606,7 +677,8 @@
     estimatePinDistance, groupPoles, pickFrontBehind,
     encodeState, decodeState, encodeStateV2, decodeStateV2, shareHash, stateFromHash,
     whenText, vehicleMatters, friendlyRule, signSummary, tidyAddress, shareText, garageWindow, garageLinks, garagePlan, themeFor, nyLocalMinute, nyIsoOffset, shareSummary, icsEvent,
-    makeCar, carHasRules, carStatus, carView, leftText, moveByText, pastText, reminderAt, icsReminder, walkInfo, isIOS, directionsUrl, carMapLink, carShareText, carDocTitle
+    nycBorough, nycScope, placeNameFrom, outsideText, NYC_RULES_WARNING,
+    makeCar, carPlace, carHasRules, carStatus, carView, leftText, moveByText, pastText, reminderAt, icsReminder, walkInfo, isIOS, directionsUrl, carMapLink, carShareText, carDocTitle
   };
   if (typeof module !== 'undefined') module.exports = api; else root.NYCSigns = api;
 })(this);

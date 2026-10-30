@@ -16,7 +16,7 @@ var d=p==='dark'||(p==='auto'&&window.matchMedia&&matchMedia('(prefers-color-sch
 var r=document.documentElement;r.setAttribute('data-theme',d?'dark':'light');r.setAttribute('data-theme-pref',p);
 var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',d?'#000000':'#f2f3f7');})();
 </script>
-<link rel="manifest" href="manifest.webmanifest?v=2f5c43c.1">
+<link rel="manifest" href="manifest.webmanifest?v=c0b9ca8.1">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -327,6 +327,26 @@ input.switch:checked::after{transform:translateX(20px)}
 .car-pin svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .me-pin span{display:block;width:18px;height:18px;border-radius:50%;background:#1A73E8;border:3px solid #fff;box-shadow:0 0 0 6px rgba(26,115,232,.22),0 1px 6px rgba(0,0,0,.3)}
 @media (max-width:360px){.car-title{font-size:22px}.car-act{font-size:12px}.car-g-more{display:none}}
+/* Outside NYC: neutral card instead of a verdict, banner on the map step, warning chip with "check anyway" */
+.nyc-only{display:flex;align-items:center;gap:6px;margin:8px 0 0!important;font-size:13.5px!important;color:var(--text-3)!important}
+.nyc-only .ic{width:15px;height:15px}
+.out-banner{display:flex;gap:11px;align-items:flex-start;padding:12px 13px;margin:0 0 12px;border-radius:var(--r-md);background:color-mix(in srgb,var(--warn) 14%,var(--card));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--warn) 40%,transparent);font-size:14.5px;line-height:1.4}
+.out-banner .o-ic{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--warn);color:#2B1800}
+.out-banner .o-ic .ic{width:18px;height:18px;stroke-width:2.6}
+.out-banner b{display:block;font-size:15.5px;margin-bottom:1px}
+.out-banner span{color:var(--text-2)}
+.verdict.out{background:var(--card);color:var(--text);box-shadow:var(--shadow-lg),inset 0 0 0 2px color-mix(in srgb,var(--warn) 55%,transparent)}
+.verdict.out::after{background:color-mix(in srgb,var(--warn) 10%,transparent)}
+.verdict.out .v-icon{background:var(--warn);color:#2B1800}
+.verdict.out .big{font-size:26px}
+.verdict.out .line{color:var(--text-2);font-size:15.5px}
+.v-anyway{appearance:none;font:inherit;font-size:15px;font-weight:650;color:var(--brand-text);background:none;border:0;padding:10px 0 2px;min-height:44px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.v-nycwarn{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;margin:12px 0 0}
+.v-nycwarn .chip-w{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:750;padding:5px 10px 5px 8px;border-radius:999px;background:#FFE3A3;color:#2B1800;white-space:nowrap}
+.v-nycwarn .chip-w .ic{width:14px;height:14px;stroke-width:2.6}
+.v-nycwarn button{appearance:none;font:inherit;font-size:13px;font-weight:650;color:inherit;opacity:.9;background:none;border:0;padding:6px 0;min-height:32px;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.car-warn{display:inline-flex;align-items:center;gap:5px;margin:8px 0 0;font-size:12.5px;font-weight:750;padding:4px 10px 4px 8px;border-radius:999px;background:#FFE3A3;color:#2B1800}
+.car-warn .ic{width:14px;height:14px;stroke-width:2.6}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media (max-width:360px){.v-key{font-size:44px}.intro h1{font-size:28px}}
 </style></head><body>
@@ -371,6 +391,7 @@ input.switch:checked::after{transform:translateX(20px)}
   <div class="car-h"><small id="carLbl">Your car</small><div class="car-addr" id="carAddr"></div></div>
   <span class="car-pill" id="carPill"></span>
  </div>
+ <div class="car-warn" id="carWarn" hidden><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>NYC rules, may not apply here</div>
  <div role="status" aria-live="polite"><div class="car-title" id="carTitle"></div><div class="car-detail" id="carDetail"></div></div>
  <div class="car-garage" id="carGarage" hidden><svg class="ic" aria-hidden="true"><use href="#i-garage"/></svg><span><span class="car-g-more">Need more time? </span>Garages nearby</span><a id="carSH" href="#" target="_blank" rel="noopener sponsored">SpotHero</a><a id="carPW" href="#" target="_blank" rel="noopener sponsored">ParkWhiz</a></div>
  <div class="car-acts">
@@ -390,6 +411,7 @@ input.switch:checked::after{transform:translateX(20px)}
 <section class="intro">
  <h1>Can I park here?</h1>
  <p>Find or snap the signs on your block. ParkHero tells you straight, and when that changes.</p>
+ <p class="nyc-only"><svg class="ic" aria-hidden="true"><use href="#i-pin"/></svg>New York City only: the five boroughs.</p>
 </section>
 
 <div id="aspBox" class="asp">
@@ -403,6 +425,7 @@ input.switch:checked::after{transform:translateX(20px)}
 <section class="step" id="step1">
  <div class="step-h"><span class="step-n">1</span><div><h2>Where are you?</h2><p>Pull the posted signs for your block from NYC's sign map.</p></div></div>
  <div class="card">
+  <div class="out-banner" id="outBanner" hidden role="status"><span class="o-ic" aria-hidden="true"><svg class="ic"><use href="#i-alert"/></svg></span><div><b>ParkHero only covers New York City</b><span id="outBannerText">You look to be outside NYC. Rules here differ, so check the posted signs and local rules.</span></div></div>
   <div class="loc-row"><span class="loc-ic"><svg class="ic"><use href="#i-pin"/></svg></span><div id="loc" class="loc">Location not set yet</div></div>
   <button type="button" class="btn btn-primary" id="findBtn"><svg class="ic"><use href="#i-map"/></svg>Find signs near me</button>
   <button type="button" class="btn btn-tinted" id="locBtn"><svg class="ic"><use href="#i-locate"/></svg>Just use my location</button>
@@ -539,7 +562,7 @@ input.switch:checked::after{transform:translateX(20px)}
    </div>
   </div>
   <button type="button" class="btn btn-primary parked-btn" id="parkedBtn"><svg class="ic"><use href="#i-car"/></svg>I parked here</button>
-  <div class="actions">
+  <div class="actions" id="nycActions">
    <button type="button" class="act" id="shareBtn"><svg class="ic"><use href="#i-share"/></svg>Share</button>
    <button type="button" class="act" id="saveBtn"><svg class="ic"><use href="#i-bookmark"/></svg>Save spot</button>
    <button type="button" class="act" id="icsBtn"><svg class="ic"><use href="#i-bell"/></svg>Remind me</button>
@@ -581,22 +604,22 @@ input.switch:checked::after{transform:translateX(20px)}
   <button type="button" role="radio" data-theme-opt="dark" aria-checked="false" aria-label="Dark" title="Dark"><svg class="ic"><use href="#i-moon"/></svg><span>Dark</span></button>
  </div>
  </div>
- <p class="foot">ParkHero is a helper, not a legal guarantee. Photo text reading can be wrong, so always compare it with the actual sign. When more than one sign is on a pole, the most restrictive one applies.</p>
+ <p class="foot"><b>New York City only.</b> ParkHero uses NYC sign data and NYC rules; parking rules elsewhere differ. ParkHero is a helper, not a legal guarantee. Photo text reading can be wrong, so always compare it with the actual sign. When more than one sign is on a pole, the most restrictive one applies.</p>
 </section>
 </main>
 
 <div class="checkbar"><button type="button" id="checkBtn" class="btn btn-primary"><svg class="ic"><use href="#i-check"/></svg><span id="checkLabel">Check parking</span></button></div>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<script src="rules.js?v=2f5c43c.1"></script>
+<script src="rules.js?v=c0b9ca8.1"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/proj4@2.11.0/dist/proj4.js"></script>
-<script src="signs.js?v=2f5c43c.1"></script>
+<script src="signs.js?v=c0b9ca8.1"></script>
 <script>
 // Partner (affiliate) IDs for the garage card. Leave empty for plain links; they are added only when set.
 //  spothero: your SpotHero affiliate id (e.g. '1234'), or a full tracking-link prefix starting with https:// that the destination URL gets appended to (URL-encoded)
 //  parkwhiz: your ParkWhiz affiliate code (sent as ?pwa=, e.g. 'pa-23')
 const AFFILIATE={spothero:'', parkwhiz:''};
-const $=id=>document.getElementById(id); let ASP={holidays:{}}, place=null, lastCheck=null, garageState=null, nearSigns=[], map, pinMarker, accCircle, signLayer;
+const $=id=>document.getElementById(id); let ASP={holidays:{}}, place=null, lastCheck=null, checkAnyway=false, lastScope='unknown', areaName=null, garageState=null, nearSigns=[], map, pinMarker, accCircle, signLayer;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const icon=(id,cls)=>`<svg class="ic${cls?' '+cls:''}" aria-hidden="true"><use href="#${id}"/></svg>`;
 const TZ='America/New_York';
@@ -633,13 +656,66 @@ function setLocHtml(label, lat, lon, acc){
   const coords=`${lat.toFixed(5)}, ${lon.toFixed(5)}${acc?` · ±${Math.round(acc)} m`:''}`;
   $('loc').innerHTML=label?`<b>${esc(label)}</b><br><span>${coords} · <a target="_blank" rel="noopener" href="https://www.google.com/maps?q=${lat},${lon}">map</a></span>`:`<b>${coords}</b>`;
   if(garageState) showGarage(garageState); // keep partner links in step with the latest address
+  updateScope();
+}
+// ---- Outside-NYC guard ----
+// The pin/GPS point decides: inside the five boroughs = normal, outside = no NYC verdict unless "check anyway".
+// No location at all stays allowed, with a quiet "NYC rules only" line.
+function placeScope(){ return place?NYCSigns.nycScope(place.lat, place.lon):'unknown'; }
+function nycLabelOk(lat,lon){ return NYCSigns.nycScope(lat,lon)!=='outside'; } // GeoSearch answers "United States" for DC; ignore it outside NYC
+function updateScope(){
+  const scope=placeScope(), changed=scope!==lastScope;
+  if(changed){ checkAnyway=false; if(scope!=='outside') areaName=null; }
+  lastScope=scope;
+  const out=scope==='outside';
+  $('outBanner').hidden=!out;
+  $('aspBox').hidden=out;
+  if(out){
+    $('outBannerText').textContent=NYCSigns.outsideText(areaName).line;
+    lookupAreaName(place.lat, place.lon);
+  }
+  if(changed && !$('resultBody').hidden) check({quiet:true});
+}
+// Place name via OpenStreetMap Nominatim: one request at a time, at most one per 1.5 s, cached per ~5 km; generic text on any failure.
+let areaBusy=false, areaLast=0, areaQueued=null;
+function lookupAreaName(lat,lon){
+  const key='ph-area:'+lat.toFixed(2)+','+lon.toFixed(2);
+  let cached; try{ cached=sessionStorage.getItem(key); }catch(e){}
+  if(cached!=null){ setAreaName(cached||null, lat, lon); return; }
+  if(areaBusy){ areaQueued=[lat,lon]; return; }
+  const wait=Math.max(0, areaLast+1500-Date.now());
+  areaBusy=true;
+  setTimeout(()=>{
+    areaLast=Date.now();
+    const ctl=window.AbortController?new AbortController():null; const to=setTimeout(()=>ctl&&ctl.abort(),6000);
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&addressdetails=1&accept-language=en&lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`,{signal:ctl?ctl.signal:undefined})
+      .then(r=>r.ok?r.json():null).then(j=>{ const n=NYCSigns.placeNameFrom(j); try{ sessionStorage.setItem(key, n||''); }catch(e){} setAreaName(n, lat, lon); })
+      .catch(()=>{}).finally(()=>{ clearTimeout(to); areaBusy=false; if(areaQueued){ const q=areaQueued; areaQueued=null; if(place&&place.lat===q[0]&&place.lon===q[1]) lookupAreaName(q[0],q[1]); } });
+  }, wait);
+}
+function setAreaName(name, lat, lon){
+  if(!place||place.lat!==lat||place.lon!==lon||placeScope()!=='outside'||name===areaName) return;
+  areaName=name;
+  $('outBannerText').textContent=NYCSigns.outsideText(areaName).line;
+  const t=document.querySelector('#verdict .out-line'); if(t) t.textContent=NYCSigns.outsideText(areaName).line;
+  if(!$('garageCard').hidden){ const l=garageHref(); if(l){ $('spotheroLink').href=l.spothero; $('parkwhizLink').href=l.parkwhiz; } }
+}
+function showOutside(quiet){
+  lastCheck=null;
+  const o=NYCSigns.outsideText(areaName);
+  showVerdict('out', headHtml('out','Outside NYC')+`<div class="big">${esc(o.title)}</div><div class="line out-line">${esc(o.line)}</div><div class="line">No verdict, countdown or Alternate Side info is shown here, because they would be NYC rules.</div><button type="button" class="v-anyway" id="anywayBtn">Check anyway with NYC rules</button>`, quiet);
+  $('parsedCard').style.display='none';
+  $('nycActions').hidden=true; $('parkedBtn').hidden=true; $('shareStatus').textContent='';
+  $('anywayBtn').onclick=()=>{ checkAnyway=true; check(); };
+  // Garages still work here (SpotHero and ParkWhiz cover DC and other cities), using the real coordinates.
+  showGarage({mode:'outside', expanded:true, moveBy:null, legalAt:null});
 }
 $('locBtn').onclick=()=>{ if(!navigator.geolocation) return $('loc').textContent='Location is not supported on this browser.';
   $('loc').textContent='Locating…';
   navigator.geolocation.getCurrentPosition(async pos=>{const {latitude:a,longitude:o,accuracy:acc}=pos.coords;
     place={lat:a,lon:o,acc:acc,label:null};
     setLocHtml(null,a,o,acc);
-    try{const j=await fetch(`https://geosearch.planninglabs.nyc/v2/reverse?point.lat=${a}&point.lon=${o}&size=1`).then(r=>r.json()); const label=j.features&&j.features[0]&&j.features[0].properties.label; if(label){ place.label=label; place.borough=j.features[0].properties.borough||null; setLocHtml(label,a,o,acc); }}catch(e){}
+    try{const j=await fetch(`https://geosearch.planninglabs.nyc/v2/reverse?point.lat=${a}&point.lon=${o}&size=1`).then(r=>r.json()); const label=j.features&&j.features[0]&&j.features[0].properties.label; if(label&&nycLabelOk(a,o)){ place.label=label; place.borough=j.features[0].properties.borough||null; setLocHtml(label,a,o,acc); }}catch(e){}
   },e=>$('loc').textContent='Location error: '+e.message,{enableHighAccuracy:true,timeout:15000});
 };
 // ---- two sign slots ----
@@ -746,7 +822,7 @@ const slots=[
 function arrowOf(slot){ const el=slot.root.querySelector('input[type=radio]:checked'); return el?el.value:'toward'; }
 function otherHasSign(slot){ return slots.some(s=>s!==slot && (s.txt.value.trim() || s.builderTouched)); }
 // ---- verdict card ----
-const VHEAD={ok:['i-check','Can park now'], warn:['i-alert','Heads up'], no:['i-x','Cannot park now']};
+const VHEAD={ok:['i-check','Can park now'], warn:['i-alert','Heads up'], no:['i-x','Cannot park now'], out:['i-info','Outside NYC']};
 function headHtml(kind,label,extra){ const [ic,def]=VHEAD[kind]||VHEAD.warn; return `<div class="v-head"><span class="v-icon">${icon(ic)}</span><span>${esc(label||def)}</span>${extra||''}</div>`; }
 // Small chip in the verdict card that says which vehicle the answer is for. Dimmed when no sign cares.
 function vehicleChip(isCom, matters){ return `<span class="v-veh${matters?'':' dim'}" data-veh="${isCom?'commercial':'passenger'}" title="${matters?'This sign treats commercial plates differently':'Same rules for any vehicle'}">${icon('i-car')}${isCom?'Commercial plates':'Passenger car'}</span>`; }
@@ -814,6 +890,9 @@ function startCountdown(target){
 function check(opts){
   const quiet=!!(opts&&opts.quiet);
   hideGarage();
+  const scope=placeScope();
+  if(scope==='outside'&&!checkAnyway){ showOutside(quiet); return; }
+  $('nycActions').hidden=false; $('parkedBtn').hidden=false;
   refreshPlaques();
   const sides=[]; const shown=[]; const notes=[]; const problems=[]; const usedBuilder=[];
   for(const slot of slots){
@@ -878,8 +957,11 @@ function check(opts){
   const small=[];
   for(const slot of usedBuilder) small.push(`Used ${slotName(slot).toLowerCase()} from “Build a sign quickly” because its text was empty.`);
   small.push(`Checked ${esc(F(now))} NYC time. Also watch for hydrants, driveways, and bus stops.`);
-  const html=headHtml(kind,label,vehicleChip(isCom,vehMatters))+key+when+'<ul class="v-lines">'+lines.map(l=>`<li>${l}</li>`).join('')+small.map(l=>`<li class="small">${l}</li>`).join('')+'</ul>';
+  if(scope==='unknown') small.push('NYC rules only. Set your location to confirm you are in the five boroughs.');
+  const nycWarn=scope==='outside'?`<div class="v-nycwarn"><span class="chip-w">${icon('i-alert')}${esc(NYCSigns.NYC_RULES_WARNING)}</span><button type="button" id="anywayOff">Back to outside-NYC notice</button></div>`:'';
+  const html=headHtml(kind,label,vehicleChip(isCom,vehMatters))+nycWarn+key+when+'<ul class="v-lines">'+lines.map(l=>`<li>${l}</li>`).join('')+small.map(l=>`<li class="small">${l}</li>`).join('')+'</ul>';
   showVerdict(kind, html, quiet);
+  if($('anywayOff')) $('anywayOff').onclick=()=>{ checkAnyway=false; check(); };
   if(shown.length) renderParsed(shown); else $('parsedCard').style.display='none';
   const whenDate=r.canPark?r.nextViolation:r.okAt;
   startCountdown(whenDate);
@@ -892,6 +974,7 @@ function check(opts){
     isTimeLimit:!!(r.canPark&&r.violationIsTimeLimit),
     rules:sides.flatMap(s=>s.rules||[]),
     sides,
+    outside:scope==='outside',
     commercial:isCom,
     vehMatters,
     at:now
@@ -909,7 +992,8 @@ function hideGarage(){ garageState=null; $('garageCard').hidden=true; }
 function garageHref(){
   if(!garageState) return null;
   // Without coordinates (typed or photographed sign, GPS off or denied) this falls back to a New York search.
-  return NYCSigns.garageLinks({lat:place&&place.lat, lon:place&&place.lon, address:placeAddress(), now:new Date(), legalAt:garageState.legalAt, affiliate:AFFILIATE});
+  const out=placeScope()==='outside';
+  return NYCSigns.garageLinks({lat:place&&place.lat, lon:place&&place.lon, address:out?'':placeAddress(), area:out?areaName:null, now:new Date(), legalAt:garageState.legalAt, affiliate:AFFILIATE});
 }
 function showGarage(st){
   garageState=st;
@@ -921,6 +1005,9 @@ function showGarage(st){
   if(!open){
     title='Need a garage?';
     sub='<span class="g-mini"><span class="g-dot sh" aria-hidden="true"></span>SpotHero · <span class="g-dot pw" aria-hidden="true"></span>ParkWhiz</span>';
+  }else if(st.mode==='outside'){
+    title='Park in a garage nearby';
+    sub=esc(`SpotHero and ParkWhiz work outside NYC too. Book a garage near this spot for ${hrsTxt}.`);
   }else if(st.mode==='later'){
     title='Prefer a garage?';
     sub=esc(links.endKnown?`Street parking is fine here until ${NYCSigns.whenText(links.legalAt,now)}. Book a garage until then instead.`:`Book a garage ${links.generic?'in NYC':'near this spot'} for ${hrsTxt}.`);
@@ -1140,7 +1227,7 @@ function applyState(state){
 function shareUrl(){ const u=new URL(location.href); u.hash=NYCSigns.shareHash(currentState()); return u.toString(); }
 function placeAddress(){ if(!place||!place.label) return ''; const b=place.borough; return place.label+(b&&place.label.toLowerCase().indexOf(b.toLowerCase())<0?', '+b:''); }
 function friendlyText(url, linkInText){
-  return NYCSigns.shareText({canPark:lastCheck.canPark, when:lastCheck.whenDate, isTimeLimit:lastCheck.isTimeLimit, now:new Date(), rules:lastCheck.rules, address:placeAddress(), commercial:lastCheck.commercial, url, linkInText});
+  return NYCSigns.shareText({canPark:lastCheck.canPark, when:lastCheck.whenDate, isTimeLimit:lastCheck.isTimeLimit, now:new Date(), rules:lastCheck.rules, address:lastCheck.outside?'':placeAddress(), commercial:lastCheck.commercial, outsideNYC:!!lastCheck.outside, url, linkInText});
 }
 async function onShare(){
   if(!lastCheck){ $('shareStatus').textContent='Check the signs first, then share.'; return; }
@@ -1186,11 +1273,15 @@ function ensureMap(lat,lon,acc){
     accCircle=L.circle([lat,lon],{radius:acc||25, color:brand, weight:1, fillColor:brand, fillOpacity:0.12}).addTo(map);
     signLayer=L.layerGroup().addTo(map);
     pinMarker=L.marker([lat,lon],{draggable:true, title:'Your car (drag to adjust)', icon:L.divIcon({className:'ph-pin', html:'<span></span>', iconSize:[26,26], iconAnchor:[13,13]})}).addTo(map);
-    pinMarker.on('dragend',()=>{ const ll=pinMarker.getLatLng(); place=Object.assign({}, place||{}, {lat:ll.lat, lon:ll.lng}); accCircle.setLatLng(ll); lookupSigns(ll.lat, ll.lng, place&&place.acc); });
+    pinMarker.on('dragend',()=>{ const ll=pinMarker.getLatLng(); place=Object.assign({}, place||{}, {lat:ll.lat, lon:ll.lng}); accCircle.setLatLng(ll); updateScope(); lookupSigns(ll.lat, ll.lng, place&&place.acc); });
   } else { map.setView([lat,lon], Math.max(map.getZoom(),17)); pinMarker.setLatLng([lat,lon]); accCircle.setLatLng([lat,lon]); accCircle.setRadius(acc||25); }
   setTimeout(()=>map.invalidateSize(), 60);
 }
 async function lookupSigns(lat, lon, acc){
+  if(NYCSigns.nycScope(lat,lon)==='outside'){
+    nearSigns=[]; $('sidePick').innerHTML=''; $('facePick').innerHTML=''; if(signLayer) signLayer.clearLayers();
+    $('findStatus').textContent='No sign data here: the city sign map only covers New York City. Drag the pin if you are actually in NYC.'; return;
+  }
   $('findStatus').textContent='Looking up NYC parking signs…';
   if(!spReady()){ $('findStatus').textContent='Could not load the coordinate converter.'; return; }
   const [x,y]=llToSp(lon, lat);
@@ -1297,7 +1388,7 @@ $('findBtn').onclick=()=>{
     setLocHtml(null, lat, lon, acc);
     ensureMap(lat, lon, acc);
     lookupSigns(lat, lon, acc);
-    fetch(`https://geosearch.planninglabs.nyc/v2/reverse?point.lat=${lat}&point.lon=${lon}&size=1`).then(r=>r.json()).then(j=>{ const label=j.features&&j.features[0]&&j.features[0].properties.label; if(label){ place.label=label; place.borough=j.features[0].properties.borough||null; setLocHtml(label, lat, lon, acc); } }).catch(()=>{});
+    fetch(`https://geosearch.planninglabs.nyc/v2/reverse?point.lat=${lat}&point.lon=${lon}&size=1`).then(r=>r.json()).then(j=>{ const label=j.features&&j.features[0]&&j.features[0].properties.label; if(label&&nycLabelOk(lat,lon)){ place.label=label; place.borough=j.features[0].properties.borough||null; setLocHtml(label, lat, lon, acc); } }).catch(()=>{});
   }, err=>{ $('findStatus').textContent='Location error: '+err.message; }, {enableHighAccuracy:true, timeout:15000});
 };
 segmentize($('facePick'));
@@ -1315,9 +1406,9 @@ function carNow(){ const c=readCar(); return c?{car:c, status:NYCSigns.carStatus
 function saveCar(coords, note){
   const c=NYCSigns.makeCar({
     parkedAt:new Date(), lat:coords&&coords.lat, lon:coords&&coords.lon, acc:coords&&coords.acc,
-    address:placeAddress()||(place&&place.label)||'',
+    address:(lastCheck&&lastCheck.outside)?(areaName||''):(placeAddress()||(place&&place.label)||''),
     sides:lastCheck?lastCheck.sides:[], commercial:lastCheck?lastCheck.commercial:$('commercial').checked,
-    verdict:lastCheck?lastCheck.verdictLine:''
+    verdict:lastCheck?lastCheck.verdictLine:'', outside:!!(lastCheck&&lastCheck.outside)
   });
   const old=readCar(); if(old) pushCarHistory(old);
   writeCar(c); closeCarFind(); renderCar();
@@ -1347,14 +1438,15 @@ function renderCar(){
   const {car, status}=cur, now=new Date(), view=NYCSigns.carView(status, now);
   card.hidden=false;
   card.className='car-card '+view.tone;
-  $('carAddr').textContent=car.address?NYCSigns.tidyAddress(car.address):(carHasLL(car)?'Pinned on the map':'No location saved');
+  $('carWarn').hidden=!car.outside;
+  $('carAddr').textContent=car.address?NYCSigns.carPlace(car):(carHasLL(car)?'Pinned on the map':'No location saved');
   $('carTitle').textContent=view.title;
   $('carDetail').textContent=(status.state==='ok'?(status.timeLimit?'Time limit ends in ':'Violation starts in ')+view.detail.replace(/ left$/,'')+'.':view.detail)+' Parked '+NYCSigns.pastText(car.parkedAt, now)+'.';
   $('carPill').textContent=status.state==='ok'?view.short:status.state==='violation'?'Move now':status.state==='none'?'All week':'';
   // Garage link when time is short or the spot is no longer legal
   const g=$('carGarage');
   if(view.soon&&(status.state==='ok'||status.state==='violation')){
-    const l=NYCSigns.garageLinks({lat:car.lat, lon:car.lon, address:car.address, now, legalAt:status.state==='violation'?status.okAt:null, affiliate:AFFILIATE});
+    const l=NYCSigns.garageLinks({lat:car.lat, lon:car.lon, address:car.outside?'':car.address, area:car.outside?car.address:null, now, legalAt:status.state==='violation'?status.okAt:null, affiliate:AFFILIATE});
     if(l){ $('carSH').href=l.spothero; $('carPW').href=l.parkwhiz; g.hidden=false; } else g.hidden=true;
   } else g.hidden=true;
   $('carRemind').disabled=false;
@@ -1392,7 +1484,7 @@ function updateWalk(){
   const url=NYCSigns.directionsUrl(c, ios), btn=$('carWalkBtn');
   if(url){ btn.href=url; btn.hidden=false; btn.lastChild.textContent='Walk there'+(ios?' in Apple Maps':''); } else btn.hidden=true;
   const w=meAt&&carHasLL(c)?NYCSigns.walkInfo(meAt, c):null;
-  const addr=c.address?NYCSigns.tidyAddress(c.address):'';
+  const addr=c.address?NYCSigns.carPlace(c):'';
   if(!carHasLL(c)) $('carWalk').innerHTML=addr?`${esc(addr)}<small>Saved without GPS, so directions use the address.</small>`:'No location was saved for this car.<small>Check where you parked.</small>';
   else $('carWalk').innerHTML=w?`${esc(w.text)}<small>${esc(addr||'Pinned spot')} · straight-line distance</small>`:`${esc(addr||'Your car')}<small>${meAt===false?'Turn on location to see how far it is.':'Finding you…'}</small>`;
 }
@@ -1426,7 +1518,7 @@ $('carRemind').onclick=onCarRemind;
 $('carShare').onclick=onCarShare;
 $('carClear').onclick=onCarClear;
 $('carFindBtn').onclick=onCarFind;
-['carSH','carPW'].forEach(id=>$(id).addEventListener('click',()=>{ const cur=carNow(); if(!cur) return; const l=NYCSigns.garageLinks({lat:cur.car.lat, lon:cur.car.lon, address:cur.car.address, now:new Date(), legalAt:cur.status.okAt||null, affiliate:AFFILIATE}); if(l) $(id).href=id==='carSH'?l.spothero:l.parkwhiz; }));
+['carSH','carPW'].forEach(id=>$(id).addEventListener('click',()=>{ const cur=carNow(); if(!cur) return; const l=NYCSigns.garageLinks({lat:cur.car.lat, lon:cur.car.lon, address:cur.car.outside?'':cur.car.address, area:cur.car.outside?cur.car.address:null, now:new Date(), legalAt:cur.status.okAt||null, affiliate:AFFILIATE}); if(l) $(id).href=id==='carSH'?l.spothero:l.parkwhiz; }));
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') renderCar(); });
 window.addEventListener('pageshow',renderCar);
 window.addEventListener('storage',e=>{ if(e.key===CAR_KEY) renderCar(); });
@@ -1440,7 +1532,7 @@ renderSpots();
     applyState(st); check();
     if(place && !place.label && place.lat!=null){
       const lat=place.lat, lon=place.lon;
-      fetch(`https://geosearch.planninglabs.nyc/v2/reverse?point.lat=${lat}&point.lon=${lon}&size=1`).then(r=>r.json()).then(j=>{ const label=j.features&&j.features[0]&&j.features[0].properties.label; if(label&&place&&place.lat===lat&&place.lon===lon){ place.label=label; place.borough=j.features[0].properties.borough||null; setLocHtml(label, lat, lon, place.acc); } }).catch(()=>{});
+      fetch(`https://geosearch.planninglabs.nyc/v2/reverse?point.lat=${lat}&point.lon=${lon}&size=1`).then(r=>r.json()).then(j=>{ const label=j.features&&j.features[0]&&j.features[0].properties.label; if(label&&nycLabelOk(lat,lon)&&place&&place.lat===lat&&place.lon===lon){ place.label=label; place.borough=j.features[0].properties.borough||null; setLocHtml(label, lat, lon, place.acc); } }).catch(()=>{});
     }
   }catch(e){}
 })();

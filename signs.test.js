@@ -521,3 +521,61 @@ test('car helpers: reminder, walking distance, directions, share text, title', (
   assert.equal(Signs.leftText(25 * 3600e3), '1d 1h'); assert.equal(Signs.leftText(59 * 60000), '59m'); assert.equal(Signs.leftText(20000), 'under 1m');
   assert.equal(Signs.pastText(T('2026-10-29T21:00:00-04:00'), now), '9:00 PM yesterday');
 });
+
+// ---- outside-NYC guard ----
+test('nycBorough / nycScope: the five boroughs in, neighbours out', () => {
+  const IN = [
+    ['Manhattan', 40.7580, -73.9855, 'Manhattan'], ['Roosevelt Island', 40.7614, -73.9496, 'Manhattan'],
+    ['Staten Island', 40.5795, -74.1502, 'Staten Island'], ['Tottenville', 40.5085, -74.2390, 'Staten Island'],
+    ['Bronx edge (Wakefield)', 40.9000, -73.8550, 'Bronx'], ['Riverdale', 40.9035, -73.9060, 'Bronx'], ['City Island', 40.8468, -73.7868, 'Bronx'],
+    ['Rockaway Beach', 40.5860, -73.8110, 'Queens'], ['Far Rockaway', 40.6050, -73.7550, 'Queens'], ['Breezy Point', 40.5560, -73.9270, 'Queens'],
+    ['JFK', 40.6413, -73.7781, 'Queens'], ['Long Island City', 40.7447, -73.9485, 'Queens'], ['Glen Oaks', 40.7470, -73.7110, 'Queens'],
+    ['Coney Island', 40.5755, -73.9707, 'Brooklyn'], ['Downtown Brooklyn', 40.6928, -73.9903, 'Brooklyn']
+  ];
+  for (const [name, lat, lon, boro] of IN) {
+    assert.equal(Signs.nycBorough(lat, lon), boro, name);
+    assert.equal(Signs.nycScope(lat, lon), 'nyc', name);
+  }
+  const OUT = [
+    ['Jersey City', 40.7178, -74.0431], ['Hoboken', 40.7440, -74.0324], ['Fort Lee', 40.8509, -73.9701], ['Bayonne', 40.6687, -74.1143],
+    ['Elizabeth', 40.6640, -74.2107], ['Perth Amboy', 40.5068, -74.2654], ['Yonkers', 40.9312, -73.8988], ['Mount Vernon', 40.9126, -73.8371],
+    ['New Rochelle', 40.9115, -73.7824], ['Valley Stream (Nassau)', 40.6643, -73.7085], ['Elmont (Nassau)', 40.7009, -73.7129],
+    ['Lawrence (Nassau)', 40.6157, -73.7296], ['Washington, DC', 38.897, -77.006]
+  ];
+  for (const [name, lat, lon] of OUT) {
+    assert.equal(Signs.nycBorough(lat, lon), null, name);
+    assert.equal(Signs.nycScope(lat, lon), 'outside', name);
+  }
+  assert.equal(Signs.nycScope(null, null), 'unknown');
+  assert.equal(Signs.nycScope('', ''), 'unknown');
+  assert.equal(Signs.nycScope(undefined, -73.98), 'unknown');
+});
+
+test('outside-NYC wording, place names, and share text', () => {
+  assert.equal(Signs.placeNameFrom({ address: { city: 'Washington', state: 'District of Columbia', 'ISO3166-2-lvl4': 'US-DC', country_code: 'us', country: 'United States' } }), 'Washington, DC');
+  assert.equal(Signs.placeNameFrom({ address: { city: 'Jersey City', state: 'New Jersey', 'ISO3166-2-lvl4': 'US-NJ', country_code: 'us' } }), 'Jersey City, NJ');
+  assert.equal(Signs.placeNameFrom({ address: { town: 'Hempstead', county: 'Nassau County', state: 'New York', 'ISO3166-2-lvl4': 'US-NY', country_code: 'us' } }), 'Hempstead, NY');
+  assert.equal(Signs.placeNameFrom({ address: { city: 'Toronto', state: 'Ontario', country: 'Canada', country_code: 'ca' } }), 'Toronto, Canada');
+  assert.equal(Signs.placeNameFrom({ error: 'Unable to geocode' }), null);
+  assert.equal(Signs.placeNameFrom(null), null);
+  assert.deepEqual(Signs.outsideText('Washington, DC'), { title: 'ParkHero only covers New York City', line: 'You look to be in Washington, DC. Rules here differ, so check the posted signs and local rules.' });
+  assert.equal(Signs.outsideText(null).line, 'You look to be outside NYC. Rules here differ, so check the posted signs and local rules.');
+  const base = { canPark: false, when: new Date('2026-10-30T19:00:00-04:00'), now: new Date('2026-10-30T13:57:00-04:00'), rules: NYC.parse('NO PARKING 7AM-7PM').rules };
+  assert.doesNotMatch(Signs.shareText(base), /NYC rules/);
+  const warned = Signs.shareText(Object.assign({ outsideNYC: true }, base));
+  assert.match(warned.split('\n')[0], /^⚠️ NYC rules, may not apply here \(this spot looks to be outside New York City\)\.$/);
+  const car = Signs.makeCar({ parkedAt: '2026-10-30T13:57:00-04:00', lat: 38.897, lon: -77.006, outside: true, sides: [{ id: 'front', arrow: 'toward', rules: base.rules }] });
+  assert.equal(car.outside, true);
+  const dcCar = Object.assign({}, car, { address: 'Washington, DC' });
+  assert.equal(Signs.carPlace(dcCar), 'Washington, DC');
+  assert.match(Signs.directionsUrl(Object.assign({}, dcCar, { lat: null, lon: null }), false), /destination=Washington,%20DC&/);
+  assert.match(Signs.carShareText(car, Signs.carStatus(car, base.now, {}, NYC), base.now), /\n⚠️ NYC rules, may not apply here \(outside New York City\)\n/);
+});
+
+test('garageLinks outside NYC use the real point and the place name, never ", NY"', () => {
+  const l = Signs.garageLinks({ lat: 38.897, lon: -77.006, address: '', area: 'Washington, DC', now: new Date('2026-10-30T13:57:00-04:00') });
+  assert.equal(l.generic, false);
+  assert.match(l.spothero, /latitude=38\.897&longitude=-77\.006/);
+  assert.match(l.spothero, /search_string=Washington%2C\+DC&/);
+  assert.match(l.parkwhiz, /^https:\/\/www\.parkwhiz\.com\/destination\/Washington-DC\/\?lat=38\.897&lng=-77\.006&/);
+});
