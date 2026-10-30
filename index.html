@@ -16,7 +16,7 @@ var d=p==='dark'||(p==='auto'&&window.matchMedia&&matchMedia('(prefers-color-sch
 var r=document.documentElement;r.setAttribute('data-theme',d?'dark':'light');r.setAttribute('data-theme-pref',p);
 var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',d?'#000000':'#f2f3f7');})();
 </script>
-<link rel="manifest" href="manifest.webmanifest">
+<link rel="manifest" href="manifest.webmanifest?v=3157557.1">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -52,15 +52,24 @@ a{color:var(--brand-text)}
 [hidden]{display:none!important}
 
 /* App bar */
-.appbar{position:sticky;top:0;z-index:1000;padding-top:env(safe-area-inset-top,0px);background:color-mix(in srgb,var(--bg) 82%,transparent);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--line)}
-.appbar-in{max-width:640px;margin:auto;display:flex;align-items:center;gap:11px;padding:10px 18px}
+.appbar{position:sticky;top:0;z-index:1200;padding-top:env(safe-area-inset-top,0px);background:color-mix(in srgb,var(--bg) 82%,transparent);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--line)}
+.appbar-in{max-width:640px;margin:auto;display:flex;align-items:center;gap:11px;padding:10px max(18px,env(safe-area-inset-right,0px)) 10px max(18px,env(safe-area-inset-left,0px));min-height:58px}
+.brand{flex:1;min-width:0}
 .logo{width:36px;height:36px;flex:none;border-radius:9px;box-shadow:0 2px 6px rgba(36,86,245,.35)}
 .brand-name{font-weight:800;font-size:19px;letter-spacing:-.01em;line-height:1.1}
-.brand-sub{font-size:12.5px;color:var(--text-2)}
+.brand-sub{font-size:12.5px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand-name{white-space:nowrap}
 /* Theme control (Auto / Light / Dark) */
-.theme-seg{margin-left:auto;display:flex;gap:2px;padding:3px;border-radius:999px;background:var(--fill);flex:none}
-.theme-seg button{width:32px;height:30px;display:grid;place-items:center;border:0;border-radius:999px;background:transparent;color:var(--text-2);cursor:pointer;padding:0;transition:background-color .18s ease,color .18s ease}
-.theme-seg button .ic{width:17px;height:17px}
+/* Theme: one icon button in the header (cycles Auto > Light > Dark), full chooser in the footer */
+.theme-btn{flex:none;width:38px;height:38px;display:grid;place-items:center;border:0;border-radius:50%;background:var(--fill);color:var(--text-2);cursor:pointer;padding:0;-webkit-appearance:none;appearance:none}
+.theme-btn .ic{width:19px;height:19px}
+.theme-btn:active{transform:scale(.94)}
+.theme-btn:focus-visible{outline:3px solid color-mix(in srgb,var(--brand) 55%,transparent);outline-offset:2px}
+.appearance{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:18px 4px 4px}
+.appearance-l{font-size:14px;font-weight:600;color:var(--text-2)}
+.theme-seg{display:flex;gap:2px;padding:3px;border-radius:999px;background:var(--fill);flex:none}
+.theme-seg button{height:32px;padding:0 11px;display:flex;align-items:center;gap:5px;border:0;border-radius:999px;background:transparent;color:var(--text-2);cursor:pointer;font:inherit;font-size:13px;font-weight:600;-webkit-appearance:none;appearance:none;transition:background-color .18s ease,color .18s ease}
+.theme-seg button .ic{width:16px;height:16px}
 .theme-seg button[aria-checked="true"]{background:var(--card);color:var(--brand-text);box-shadow:0 1px 2px rgba(0,0,0,.08),0 2px 8px rgba(0,0,0,.08)}
 :root[data-theme="dark"] .theme-seg button[aria-checked="true"]{background:#48484A;color:#fff}
 .theme-seg button:focus-visible{outline:3px solid color-mix(in srgb,var(--brand) 55%,transparent);outline-offset:1px}
@@ -125,7 +134,7 @@ textarea{min-height:110px;font-family:ui-monospace,"SF Mono",Menlo,monospace;fon
 .loc-ic{width:40px;height:40px;border-radius:12px;background:var(--brand-soft);color:var(--brand-text);display:grid;place-items:center;flex:none}
 .loc{font-size:15px;color:var(--text-2);min-width:0;overflow-wrap:anywhere}
 .loc b{color:var(--text);font-size:16px}
-.map-frame{border-radius:var(--r-lg);overflow:hidden;margin:14px 0 6px;box-shadow:inset 0 0 0 1px var(--line);background:var(--fill)}
+.map-frame{position:relative;z-index:0;isolation:isolate;border-radius:var(--r-lg);overflow:hidden;margin:14px 0 6px;box-shadow:inset 0 0 0 1px var(--line);background:var(--fill)}
 #map{height:290px;width:100%}
 .leaflet-container{font-family:var(--font)}
 :root[data-theme="dark"] .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88)}
@@ -243,6 +252,10 @@ input.switch:checked::after{transform:translateX(20px)}
 .g-btn .ic{width:16px;height:16px;opacity:.75}
 .g-dot{width:10px;height:10px;border-radius:50%;flex:none}.g-dot.sh{background:#F2463A}.g-dot.pw{background:#11A86B}
 .g-note{margin-top:10px;font-size:12px;color:var(--text-3);text-align:center}
+.g-loc{display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--fill);font-size:13px;line-height:1.35;color:var(--text-2)}
+.g-loc span{flex:1;min-width:0}
+.g-locbtn{flex:none;display:inline-flex;align-items:center;gap:5px;border:0;border-radius:999px;padding:7px 11px;background:var(--card);color:var(--brand-text);font:inherit;font-size:13px;font-weight:700;cursor:pointer;-webkit-appearance:none;appearance:none}
+.g-locbtn .ic{width:15px;height:15px}
 .actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .act{appearance:none;font:inherit;border:0;background:var(--card);color:var(--brand-text);box-shadow:var(--shadow);border-radius:var(--r-lg);min-height:68px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-size:13.5px;font-weight:650;cursor:pointer;transition:transform .12s ease}
 .act:active{transform:scale(.97)}
@@ -311,12 +324,8 @@ input.switch:checked::after{transform:translateX(20px)}
 
 <header class="appbar"><div class="appbar-in">
  <svg class="logo" viewBox="0 0 64 64" role="img" aria-label="ParkHero logo"><use href="#ph-logo"/></svg>
- <div><div class="brand-name">ParkHero</div><div class="brand-sub">NYC parking sign checker</div></div>
- <div class="theme-seg" id="themeSeg" role="radiogroup" aria-label="Appearance">
-  <button type="button" role="radio" data-theme-opt="auto" aria-checked="true" aria-label="Auto (match system)" title="Auto (match system)"><svg class="ic"><use href="#i-auto"/></svg></button>
-  <button type="button" role="radio" data-theme-opt="light" aria-checked="false" aria-label="Light" title="Light"><svg class="ic"><use href="#i-sun"/></svg></button>
-  <button type="button" role="radio" data-theme-opt="dark" aria-checked="false" aria-label="Dark" title="Dark"><svg class="ic"><use href="#i-moon"/></svg></button>
- </div>
+ <div class="brand"><div class="brand-name">ParkHero</div><div class="brand-sub">NYC parking sign checker</div></div>
+ <button type="button" id="themeBtn" class="theme-btn" aria-label="Appearance: Auto. Tap to change." title="Appearance: Auto"><svg class="ic"><use href="#i-auto"/></svg></button>
 </div></header>
 
 <main>
@@ -467,6 +476,7 @@ input.switch:checked::after{transform:translateX(20px)}
     <a id="spotheroLink" class="g-btn" href="#" target="_blank" rel="noopener sponsored"><span class="g-dot sh" aria-hidden="true"></span>SpotHero<svg class="ic"><use href="#i-ext"/></svg></a>
     <a id="parkwhizLink" class="g-btn" href="#" target="_blank" rel="noopener sponsored"><span class="g-dot pw" aria-hidden="true"></span>ParkWhiz<svg class="ic"><use href="#i-ext"/></svg></a>
    </div>
+   <div class="g-loc" id="garageLoc" hidden><span>Showing garages around Midtown. Add your location for nearby garages.</span><button type="button" id="garageLocBtn" class="g-locbtn"><svg class="ic"><use href="#i-locate"/></svg>Use my location</button></div>
    <div class="g-note">Partner links · open in a new tab · prices and booking by each site</div>
    </div>
   </div>
@@ -505,16 +515,23 @@ input.switch:checked::after{transform:translateX(20px)}
    <a href="https://www.nyc.gov/html/dot/html/motorist/parknyc.shtml" target="_blank" rel="noopener">ParkNYC</a>
   </div>
  </details>
+ <div class="appearance"><span class="appearance-l">Appearance</span>
+ <div class="theme-seg" id="themeSeg" role="radiogroup" aria-label="Appearance">
+  <button type="button" role="radio" data-theme-opt="auto" aria-checked="true" aria-label="Auto (match system)" title="Auto (match system)"><svg class="ic"><use href="#i-auto"/></svg><span>Auto</span></button>
+  <button type="button" role="radio" data-theme-opt="light" aria-checked="false" aria-label="Light" title="Light"><svg class="ic"><use href="#i-sun"/></svg><span>Light</span></button>
+  <button type="button" role="radio" data-theme-opt="dark" aria-checked="false" aria-label="Dark" title="Dark"><svg class="ic"><use href="#i-moon"/></svg><span>Dark</span></button>
+ </div>
+ </div>
  <p class="foot">ParkHero is a helper, not a legal guarantee. Photo text reading can be wrong, so always compare it with the actual sign. When more than one sign is on a pole, the most restrictive one applies.</p>
 </section>
 </main>
 
 <div class="checkbar"><button type="button" id="checkBtn" class="btn btn-primary"><svg class="ic"><use href="#i-check"/></svg><span id="checkLabel">Check parking</span></button></div>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<script src="rules.js"></script>
+<script src="rules.js?v=3157557.1"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/proj4@2.11.0/dist/proj4.js"></script>
-<script src="signs.js"></script>
+<script src="signs.js?v=3157557.1"></script>
 <script>
 // Partner (affiliate) IDs for the garage card. Leave empty for plain links; they are added only when set.
 //  spothero: your SpotHero affiliate id (e.g. '1234'), or a full tracking-link prefix starting with https:// that the destination URL gets appended to (URL-encoded)
@@ -751,7 +768,7 @@ function check(opts){
     if(got.fromBuilder) usedBuilder.push(slot);
   }
   refreshPlaques();
-  if(problems.length){ lastCheck=null; showVerdict('warn', problems.join(''), quiet); if(shown.length) renderParsed(shown); else $('parsedCard').style.display='none'; return; }
+  if(problems.length){ lastCheck=null; showVerdict('warn', problems.join(''), quiet); if(shown.length) renderParsed(shown); else $('parsedCard').style.display='none'; showGarage({mode:'later', expanded:false, moveBy:null, legalAt:null}); return; }
   if(!sides.length){ lastCheck=null; showVerdict('warn', problemHtml('Add a sign first','Snap, type, or build the sign in front of your car, or set its arrow to point toward the car.'), quiet); $('parsedCard').style.display='none'; return; }
   const now=new Date();
   const isCom=$('commercial').checked;
@@ -829,8 +846,9 @@ function check(opts){
 }
 function hideGarage(){ garageState=null; $('garageCard').hidden=true; }
 function garageHref(){
-  if(!garageState||!place) return null;
-  return NYCSigns.garageLinks({lat:place.lat, lon:place.lon, address:placeAddress(), now:new Date(), legalAt:garageState.legalAt, affiliate:AFFILIATE});
+  if(!garageState) return null;
+  // Without coordinates (typed or photographed sign, GPS off or denied) this falls back to a New York search.
+  return NYCSigns.garageLinks({lat:place&&place.lat, lon:place&&place.lon, address:placeAddress(), now:new Date(), legalAt:garageState.legalAt, affiliate:AFFILIATE});
 }
 function showGarage(st){
   garageState=st;
@@ -844,19 +862,21 @@ function showGarage(st){
     sub='<span class="g-mini"><span class="g-dot sh" aria-hidden="true"></span>SpotHero · <span class="g-dot pw" aria-hidden="true"></span>ParkWhiz</span>';
   }else if(st.mode==='later'){
     title='Prefer a garage?';
-    sub=esc(links.endKnown?`Street parking is fine here until ${NYCSigns.whenText(links.legalAt,now)}. Book a garage until then instead.`:`Book a garage near this spot for ${hrsTxt}.`);
+    sub=esc(links.endKnown?`Street parking is fine here until ${NYCSigns.whenText(links.legalAt,now)}. Book a garage until then instead.`:`Book a garage ${links.generic?'in NYC':'near this spot'} for ${hrsTxt}.`);
   }else{
     title=st.mode==='soon'?'Need longer? Try a garage':'Park in a garage nearby';
-    const plan=links.endKnown?`Street parking opens again at ${NYCSigns.whenText(links.legalAt,now)}. Book a garage until then.`:`Book a garage near this spot for ${hrsTxt}.`;
+    const plan=links.endKnown?`Street parking opens again at ${NYCSigns.whenText(links.legalAt,now)}. Book a garage until then.`:`Book a garage ${links.generic?'in NYC':'near this spot'} for ${hrsTxt}.`;
     sub=esc((st.mode==='soon'?`Your spot ends at ${tOnly(st.moveBy)}. `:'')+plan);
   }
   $('garageTitle').textContent=title; $('garageSub').innerHTML=sub;
   card.classList.toggle('collapsed',!open);
   $('garageToggle').setAttribute('aria-expanded',String(open));
   $('garageBody').hidden=!open;
+  $('garageLoc').hidden=!links.generic;
   $('spotheroLink').href=links.spothero; $('parkwhizLink').href=links.parkwhiz;
   card.hidden=false;
 }
+$('garageLocBtn').addEventListener('click',()=>$('locBtn').click());
 $('garageToggle').addEventListener('click',()=>{ if(garageState) showGarage(Object.assign({},garageState,{expanded:!garageState.expanded})); });
 // Refresh the times right before leaving, so a card left open a while still starts "now".
 ['spotheroLink','parkwhizLink'].forEach(id=>$(id).addEventListener('click',()=>{ const l=garageHref(); if(l) $(id).href=id==='spotheroLink'?l.spothero:l.parkwhiz; }));
@@ -868,11 +888,15 @@ function applyTheme(pref){
   root.setAttribute('data-theme',t.mode); root.setAttribute('data-theme-pref',t.pref);
   document.querySelector('meta[name="theme-color"]').setAttribute('content',t.color);
   document.querySelectorAll('#themeSeg [data-theme-opt]').forEach(b=>{ const on=b.dataset.themeOpt===t.pref; b.setAttribute('aria-checked',String(on)); b.tabIndex=on?0:-1; });
+  const name={auto:'Auto',light:'Light',dark:'Dark'}[t.pref], btn=$('themeBtn');
+  btn.querySelector('use').setAttribute('href',{auto:'#i-auto',light:'#i-sun',dark:'#i-moon'}[t.pref]);
+  btn.setAttribute('aria-label',`Appearance: ${name}. Tap to change.`); btn.title=`Appearance: ${name}`;
 }
+function setTheme(pref){ try{ pref==='auto'?localStorage.removeItem(THEME_KEY):localStorage.setItem(THEME_KEY,pref); }catch(err){} applyTheme(pref); }
+$('themeBtn').addEventListener('click',()=>{ const order=['auto','light','dark'], cur=NYCSigns.themeFor(themePref(),false).pref; setTheme(order[(order.indexOf(cur)+1)%3]); });
 $('themeSeg').addEventListener('click',e=>{
   const b=e.target.closest('[data-theme-opt]'); if(!b) return;
-  try{ b.dataset.themeOpt==='auto'?localStorage.removeItem(THEME_KEY):localStorage.setItem(THEME_KEY,b.dataset.themeOpt); }catch(err){}
-  applyTheme(b.dataset.themeOpt);
+  setTheme(b.dataset.themeOpt);
 });
 $('themeSeg').addEventListener('keydown',e=>{
   const opts=[...document.querySelectorAll('#themeSeg [data-theme-opt]')], i=opts.indexOf(document.activeElement);

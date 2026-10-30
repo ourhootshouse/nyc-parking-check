@@ -326,7 +326,29 @@ test('garageLinks: winter offset, no address, no location', () => {
   assert.equal(pw.searchParams.get('start'), '2026-12-01T12:00:00-05:00');
   assert.equal(pw.searchParams.get('end'), '2026-12-01T14:00:00-05:00');
   assert.equal(new URL(links.spothero).searchParams.get('search_string'), null);
-  assert.equal(Signs.garageLinks({ lat: null, lon: null, now: new Date() }), null);
+  assert.equal(links.generic, false);
+  assert.equal(Signs.garageLinks({ lat: null, lon: null, now: new Date(), fallback: false }), null);
+});
+
+test('garageLinks without coordinates falls back to a New York search', () => {
+  const now = new Date('2026-10-30T10:15:00-04:00'), legalAt = new Date('2026-10-30T19:00:00-04:00');
+  for (const loc of [{}, { lat: null, lon: null }, { lat: '', lon: '' }, { lat: NaN, lon: 1 }]) {
+    const l = Signs.garageLinks(Object.assign({ now, legalAt }, loc));
+    assert.equal(l.generic, true);
+    const sh = new URL(l.spothero), pw = new URL(l.parkwhiz);
+    assert.equal(sh.origin + sh.pathname, 'https://spothero.com/search');
+    assert.equal(sh.searchParams.get('search_string'), 'New York, NY');
+    assert.equal(sh.searchParams.get('latitude'), null);
+    assert.equal(sh.searchParams.get('starts'), '2026-10-30T10:15');
+    assert.equal(sh.searchParams.get('ends'), '2026-10-30T19:00');
+    assert.equal(pw.pathname, '/destination/New-York-NY/');
+    assert.equal(pw.searchParams.get('lat'), '40.758');
+    assert.equal(pw.searchParams.get('lng'), '-73.9855');
+    assert.equal(pw.searchParams.get('end'), '2026-10-30T19:00:00-04:00');
+  }
+  // affiliate still applied on the fallback
+  const a = Signs.garageLinks({ now, legalAt, affiliate: { parkwhiz: 'pa-23' } });
+  assert.equal(new URL(a.parkwhiz).searchParams.get('pwa'), 'pa-23');
 });
 
 test('garageLinks appends affiliate IDs only when set', () => {

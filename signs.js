@@ -379,18 +379,22 @@
     return 'https://spothero.app.link/ts1p2NqSe1?%243p=a_hasoffers&%24affiliate_json=' + encodeURIComponent(tracking) + '&' + url.split('?')[1];
   }
   // Build both partner search links. info: { lat, lon, address, now, legalAt, affiliate:{spothero, parkwhiz} }
+  const NYC_CENTER = { lat: 40.758, lon: -73.9855 };
   function garageLinks(info) {
     const i = info || {};
-    if (i.lat == null || i.lon == null || !isFinite(i.lat) || !isFinite(i.lon)) return null;
-    const lat = round5(i.lat), lon = round5(i.lon);
+    // No coordinates (typed or photographed sign, GPS off): fall back to a New York search.
+    // SpotHero geocodes search_string on its own; ParkWhiz needs a point, so it gets Midtown (Times Square).
+    const generic = i.lat == null || i.lon == null || i.lat === '' || i.lon === '' || !isFinite(i.lat) || !isFinite(i.lon);
+    if (generic && i.fallback === false) return null;
+    const lat = generic ? NYC_CENTER.lat : round5(i.lat), lon = generic ? NYC_CENTER.lon : round5(i.lon);
     const win = garageWindow(i.now || new Date(), i.legalAt);
     const aff = i.affiliate || {};
     const addr = tidyAddress(i.address);
     const sh = new URLSearchParams();
     sh.set('kind', 'address');
-    sh.set('latitude', String(lat));
-    sh.set('longitude', String(lon));
+    if (!generic) { sh.set('latitude', String(lat)); sh.set('longitude', String(lon)); }
     if (addr) sh.set('search_string', addr.replace(/, NYC$/, ', New York') + ', NY');
+    else if (generic) sh.set('search_string', 'New York, NY');
     sh.set('starts', nyLocalMinute(win.start));
     sh.set('ends', nyLocalMinute(win.end));
     const spothero = spotHeroAffiliate('https://spothero.com/search?' + sh.toString(), aff.spothero);
@@ -400,8 +404,8 @@
     pw.set('start', nyIsoOffset(win.start));
     pw.set('end', nyIsoOffset(win.end));
     if (String(aff.parkwhiz || '').trim()) pw.set('pwa', String(aff.parkwhiz).trim());
-    const parkwhiz = 'https://www.parkwhiz.com/destination/' + slugTitle(i.address) + '/?' + pw.toString();
-    return { spothero, parkwhiz, start: win.start, end: win.end, endKnown: win.known, legalAt: win.known ? new Date(i.legalAt) : null };
+    const parkwhiz = 'https://www.parkwhiz.com/destination/' + (generic ? 'New-York-NY' : slugTitle(i.address)) + '/?' + pw.toString();
+    return { spothero, parkwhiz, generic, start: win.start, end: win.end, endKnown: win.known, legalAt: win.known ? new Date(i.legalAt) : null };
   }
 
   // Which garage card to show for a result, and how long to book.
