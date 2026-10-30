@@ -7,8 +7,15 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#f2f3f7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f2f3f7">
+<script>
+/* Theme: apply the saved Auto / Light / Dark choice before first paint (no flash). Mirrors NYCSigns.themeFor. */
+(function(){var p='auto';try{p=localStorage.getItem('parkhero-theme')||'auto'}catch(e){}
+if(p!=='light'&&p!=='dark')p='auto';
+var d=p==='dark'||(p==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
+var r=document.documentElement;r.setAttribute('data-theme',d?'dark':'light');r.setAttribute('data-theme-pref',p);
+var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',d?'#000000':'#f2f3f7');})();
+</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -26,12 +33,15 @@
   --safe-b:env(safe-area-inset-bottom,0px);
   color-scheme:light dark;
 }
-@media (prefers-color-scheme:dark){:root{
+/* Dark theme: set on <html data-theme="dark"> by the head script (Auto follows the system) */
+:root[data-theme="dark"]{
+  color-scheme:dark;
   --brand:#5B82FF; --brand-2:#7A9BFF; --btn-a:#3F6BFA; --btn-b:#2B55E6; --brand-soft:rgba(91,130,255,.16); --brand-text:#8EA9FF;
   --bg:#000000; --card:#1C1C1E; --text:#F5F5F7; --text-2:#A7ABB3; --text-3:#8D929B;
   --line:rgba(255,255,255,.09); --fill:#2C2C2E; --fill-2:#3A3A3C;
   --shadow:0 0 0 1px rgba(255,255,255,.04); --shadow-lg:0 0 0 1px rgba(255,255,255,.06),0 18px 40px rgba(0,0,0,.5);
-}}
+}
+:root[data-theme="light"]{color-scheme:light}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;font-family:var(--font);background:var(--bg);color:var(--text);font-size:17px;line-height:1.4;-webkit-font-smoothing:antialiased}
@@ -47,6 +57,13 @@ a{color:var(--brand-text)}
 .logo{width:36px;height:36px;flex:none;border-radius:9px;box-shadow:0 2px 6px rgba(36,86,245,.35)}
 .brand-name{font-weight:800;font-size:19px;letter-spacing:-.01em;line-height:1.1}
 .brand-sub{font-size:12.5px;color:var(--text-2)}
+/* Theme control (Auto / Light / Dark) */
+.theme-seg{margin-left:auto;display:flex;gap:2px;padding:3px;border-radius:999px;background:var(--fill);flex:none}
+.theme-seg button{width:32px;height:30px;display:grid;place-items:center;border:0;border-radius:999px;background:transparent;color:var(--text-2);cursor:pointer;padding:0;transition:background-color .18s ease,color .18s ease}
+.theme-seg button .ic{width:17px;height:17px}
+.theme-seg button[aria-checked="true"]{background:var(--card);color:var(--brand-text);box-shadow:0 1px 2px rgba(0,0,0,.08),0 2px 8px rgba(0,0,0,.08)}
+:root[data-theme="dark"] .theme-seg button[aria-checked="true"]{background:#48484A;color:#fff}
+.theme-seg button:focus-visible{outline:3px solid color-mix(in srgb,var(--brand) 55%,transparent);outline-offset:1px}
 
 main{max-width:640px;margin:auto;padding:6px 16px calc(116px + var(--safe-b))}
 .intro{padding:18px 4px 6px}
@@ -99,7 +116,7 @@ textarea{min-height:110px;font-family:ui-monospace,"SF Mono",Menlo,monospace;fon
 .seg label,.seg button{flex:1;position:relative;min-height:40px;display:flex;align-items:center;justify-content:center;gap:4px;font:inherit;font-size:14px;font-weight:600;border:0;background:transparent;border-radius:10px;color:var(--text-2);cursor:pointer;text-align:center;padding:6px 6px;transition:background-color .18s ease,color .18s ease,box-shadow .18s ease;line-height:1.15}
 .seg input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
 .seg label:has(input:checked),.seg button[aria-checked="true"]{background:var(--card);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.08),0 2px 8px rgba(0,0,0,.08)}
-@media (prefers-color-scheme:dark){.seg label:has(input:checked),.seg button[aria-checked="true"]{background:#636366}}
+:root[data-theme="dark"] .seg label:has(input:checked),:root[data-theme="dark"] .seg button[aria-checked="true"]{background:#636366}
 .seg label:has(input:focus-visible){outline:3px solid color-mix(in srgb,var(--brand) 55%,transparent)}
 .seg .ar{font-size:15px}
 
@@ -111,7 +128,7 @@ textarea{min-height:110px;font-family:ui-monospace,"SF Mono",Menlo,monospace;fon
 .map-frame{border-radius:var(--r-lg);overflow:hidden;margin:14px 0 6px;box-shadow:inset 0 0 0 1px var(--line);background:var(--fill)}
 #map{height:290px;width:100%}
 .leaflet-container{font-family:var(--font)}
-@media (prefers-color-scheme:dark){.leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88)}}
+:root[data-theme="dark"] .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88)}
 .ph-pin span{display:block;width:26px;height:26px;border-radius:50%;background:var(--brand);border:4px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.35),0 0 0 8px color-mix(in srgb,var(--brand) 22%,transparent)}
 .leaflet-popup-content-wrapper{border-radius:14px}
 .leaflet-popup-content{font-size:13px;line-height:1.35}
@@ -208,10 +225,18 @@ input.switch:checked::after{transform:translateX(20px)}
 .verdict .line{font-size:15px;margin:8px 0;line-height:1.4}
 .verdict b{font-weight:800}
 .garage{padding:14px 14px 12px;margin:12px 0}
-.g-top{display:flex;align-items:center;gap:12px}
+.g-top{display:flex;align-items:center;gap:12px;width:100%;border:0;background:transparent;padding:0;margin:0;font:inherit;color:inherit;text-align:left;cursor:pointer;border-radius:12px}
+.g-top:focus-visible{outline:3px solid color-mix(in srgb,var(--brand) 55%,transparent);outline-offset:4px}
+.g-chev{width:20px;height:20px;color:var(--text-3);transition:transform .2s ease;align-self:center}
+.garage:not(.collapsed) .g-chev{transform:rotate(180deg)}
+.garage.collapsed{padding:10px 14px}
+.garage.collapsed .g-ic{width:34px;height:34px;border-radius:10px}.garage.collapsed .g-ic .ic{width:19px;height:19px}
+.garage.collapsed .g-txt b{font-size:16px}
+.g-mini{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--text-2)}
+.g-mini .g-dot{width:8px;height:8px}
 .g-ic{width:44px;height:44px;border-radius:13px;background:linear-gradient(160deg,var(--btn-a),var(--btn-b));color:#fff;display:grid;place-items:center;flex:none;box-shadow:0 6px 14px -6px color-mix(in srgb,var(--brand) 70%,transparent)}
 .g-ic .ic{width:24px;height:24px}
-.g-txt{flex:1;min-width:0}.g-txt b{display:block;font-size:17px;font-weight:700;letter-spacing:-.01em}.g-txt small{display:block;font-size:14px;color:var(--text-2);line-height:1.35;margin-top:2px}
+.g-txt{flex:1;min-width:0;display:block}.g-txt b{display:block;font-size:17px;font-weight:700;letter-spacing:-.01em}.g-txt small{display:block;font-size:14px;color:var(--text-2);line-height:1.35;margin-top:2px}
 .g-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
 .g-btn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:10px 8px;border-radius:14px;background:var(--brand-soft);color:var(--brand-text);font-weight:700;font-size:16px;text-decoration:none;white-space:nowrap}
 .g-btn:active{transform:scale(.97)}
@@ -277,12 +302,21 @@ input.switch:checked::after{transform:translateX(20px)}
  <symbol id="i-car" viewBox="0 0 24 24"><path d="M3.5 16.5V12l2.2-5.2A2 2 0 0 1 7.5 5.5h9a2 2 0 0 1 1.8 1.3L20.5 12v4.5z"/><path d="M3.5 12h17"/><circle cx="7.5" cy="16.5" r="1.8"/><circle cx="16.5" cy="16.5" r="1.8"/></symbol>
  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
  <symbol id="i-bookopen" viewBox="0 0 24 24"><path d="M3 5h6a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H3zM21 5h-6a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h7z"/></symbol>
+ <symbol id="i-auto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" stroke="none"/></symbol>
+ <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></symbol>
+ <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
+ <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
  <symbol id="i-arrows" viewBox="0 0 24 24"><path d="M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4"/></symbol>
 </defs></svg>
 
 <header class="appbar"><div class="appbar-in">
  <svg class="logo" viewBox="0 0 64 64" role="img" aria-label="ParkHero logo"><use href="#ph-logo"/></svg>
  <div><div class="brand-name">ParkHero</div><div class="brand-sub">NYC parking sign checker</div></div>
+ <div class="theme-seg" id="themeSeg" role="radiogroup" aria-label="Appearance">
+  <button type="button" role="radio" data-theme-opt="auto" aria-checked="true" aria-label="Auto (match system)" title="Auto (match system)"><svg class="ic"><use href="#i-auto"/></svg></button>
+  <button type="button" role="radio" data-theme-opt="light" aria-checked="false" aria-label="Light" title="Light"><svg class="ic"><use href="#i-sun"/></svg></button>
+  <button type="button" role="radio" data-theme-opt="dark" aria-checked="false" aria-label="Dark" title="Dark"><svg class="ic"><use href="#i-moon"/></svg></button>
+ </div>
 </div></header>
 
 <main>
@@ -427,12 +461,14 @@ input.switch:checked::after{transform:translateX(20px)}
  <div id="resultBody" hidden>
   <div id="verdict" class="verdict" role="status" aria-live="polite"></div>
   <div id="garageCard" class="card garage" hidden>
-   <div class="g-top"><span class="g-ic"><svg class="ic"><use href="#i-garage"/></svg></span><div class="g-txt"><b id="garageTitle">Park in a garage nearby</b><small id="garageSub">Book a spot now and skip the ticket.</small></div></div>
+   <button type="button" id="garageToggle" class="g-top" aria-expanded="true" aria-controls="garageBody"><span class="g-ic"><svg class="ic"><use href="#i-garage"/></svg></span><span class="g-txt"><b id="garageTitle">Park in a garage nearby</b><small id="garageSub">Book a spot now and skip the ticket.</small></span><svg class="ic g-chev" aria-hidden="true"><use href="#i-chev"/></svg></button>
+   <div id="garageBody">
    <div class="g-btns">
     <a id="spotheroLink" class="g-btn" href="#" target="_blank" rel="noopener sponsored"><span class="g-dot sh" aria-hidden="true"></span>SpotHero<svg class="ic"><use href="#i-ext"/></svg></a>
     <a id="parkwhizLink" class="g-btn" href="#" target="_blank" rel="noopener sponsored"><span class="g-dot pw" aria-hidden="true"></span>ParkWhiz<svg class="ic"><use href="#i-ext"/></svg></a>
    </div>
    <div class="g-note">Partner links · open in a new tab · prices and booking by each site</div>
+   </div>
   </div>
   <div class="actions">
    <button type="button" class="act" id="shareBtn"><svg class="ic"><use href="#i-share"/></svg>Share</button>
@@ -782,14 +818,14 @@ function check(opts){
     vehMatters,
     at:now
   };
-  // Garage card: can't park, or the current window ends within about 2 hours.
-  const garageSoon=r.canPark && r.nextViolation && (r.nextViolation-now)<=2*3600e3;
-  if(!r.canPark || garageSoon){
-    let legalAt=null;
-    if(!r.canPark) legalAt=r.okAt||null;
-    else if(!r.violationIsTimeLimit){ const after=NYCRules.evaluateSides(sides, new Date(+r.nextViolation+60000), ASP.holidays, {commercial:isCom}); legalAt=after.canPark?null:(after.okAt||null); }
-    showGarage({soon:!!garageSoon, moveBy:r.nextViolation||null, legalAt});
+  // Garage card on every result: expanded when you can't park or have under 2 hours, a collapsed row otherwise.
+  let afterOkAt=null;
+  if(r.canPark && r.nextViolation && (r.nextViolation-now)<=2*3600e3 && !r.violationIsTimeLimit){
+    const after=NYCRules.evaluateSides(sides, new Date(+r.nextViolation+60000), ASP.holidays, {commercial:isCom});
+    afterOkAt=after.canPark?null:(after.okAt||null);
   }
+  const plan=NYCSigns.garagePlan({canPark:r.canPark, nextViolation:r.nextViolation, okAt:r.okAt, afterOkAt, now});
+  showGarage({mode:plan.mode, expanded:plan.expanded, moveBy:r.nextViolation||null, legalAt:plan.until});
 }
 function hideGarage(){ garageState=null; $('garageCard').hidden=true; }
 function garageHref(){
@@ -800,16 +836,51 @@ function showGarage(st){
   garageState=st;
   const links=garageHref();
   if(!links){ $('garageCard').hidden=true; return; }
-  const now=new Date();
-  $('garageTitle').textContent=st.soon?'Need longer? Try a garage':'Park in a garage nearby';
-  const hrsTxt=Math.round((links.end-links.start)/3600e3)===1?'the next hour':'the next '+Math.round((links.end-links.start)/3600e3)+' hours';
-  const plan=links.endKnown?`Street parking opens again at ${NYCSigns.whenText(links.legalAt,now)}. Book a garage until then.`:`Book a garage near this spot for ${hrsTxt}.`;
-  $('garageSub').textContent=(st.soon?`Your spot ends at ${tOnly(st.moveBy)}. `:'')+plan;
+  const now=new Date(), card=$('garageCard'), open=!!st.expanded;
+  const hrs=Math.round((links.end-links.start)/3600e3), hrsTxt=hrs===1?'the next hour':`the next ${hrs} hours`;
+  let title, sub;
+  if(!open){
+    title='Need a garage?';
+    sub='<span class="g-mini"><span class="g-dot sh" aria-hidden="true"></span>SpotHero · <span class="g-dot pw" aria-hidden="true"></span>ParkWhiz</span>';
+  }else if(st.mode==='later'){
+    title='Prefer a garage?';
+    sub=esc(links.endKnown?`Street parking is fine here until ${NYCSigns.whenText(links.legalAt,now)}. Book a garage until then instead.`:`Book a garage near this spot for ${hrsTxt}.`);
+  }else{
+    title=st.mode==='soon'?'Need longer? Try a garage':'Park in a garage nearby';
+    const plan=links.endKnown?`Street parking opens again at ${NYCSigns.whenText(links.legalAt,now)}. Book a garage until then.`:`Book a garage near this spot for ${hrsTxt}.`;
+    sub=esc((st.mode==='soon'?`Your spot ends at ${tOnly(st.moveBy)}. `:'')+plan);
+  }
+  $('garageTitle').textContent=title; $('garageSub').innerHTML=sub;
+  card.classList.toggle('collapsed',!open);
+  $('garageToggle').setAttribute('aria-expanded',String(open));
+  $('garageBody').hidden=!open;
   $('spotheroLink').href=links.spothero; $('parkwhizLink').href=links.parkwhiz;
-  $('garageCard').hidden=false;
+  card.hidden=false;
 }
+$('garageToggle').addEventListener('click',()=>{ if(garageState) showGarage(Object.assign({},garageState,{expanded:!garageState.expanded})); });
 // Refresh the times right before leaving, so a card left open a while still starts "now".
 ['spotheroLink','parkwhizLink'].forEach(id=>$(id).addEventListener('click',()=>{ const l=garageHref(); if(l) $(id).href=id==='spotheroLink'?l.spothero:l.parkwhiz; }));
+// Theme control: Auto follows the system; Light/Dark are saved and applied by the head script on the next load.
+const THEME_KEY='parkhero-theme', sysDark=window.matchMedia?matchMedia('(prefers-color-scheme: dark)'):null;
+function themePref(){ try{ return localStorage.getItem(THEME_KEY)||'auto'; }catch(e){ return 'auto'; } }
+function applyTheme(pref){
+  const t=NYCSigns.themeFor(pref, !!(sysDark&&sysDark.matches)), root=document.documentElement;
+  root.setAttribute('data-theme',t.mode); root.setAttribute('data-theme-pref',t.pref);
+  document.querySelector('meta[name="theme-color"]').setAttribute('content',t.color);
+  document.querySelectorAll('#themeSeg [data-theme-opt]').forEach(b=>{ const on=b.dataset.themeOpt===t.pref; b.setAttribute('aria-checked',String(on)); b.tabIndex=on?0:-1; });
+}
+$('themeSeg').addEventListener('click',e=>{
+  const b=e.target.closest('[data-theme-opt]'); if(!b) return;
+  try{ b.dataset.themeOpt==='auto'?localStorage.removeItem(THEME_KEY):localStorage.setItem(THEME_KEY,b.dataset.themeOpt); }catch(err){}
+  applyTheme(b.dataset.themeOpt);
+});
+$('themeSeg').addEventListener('keydown',e=>{
+  const opts=[...document.querySelectorAll('#themeSeg [data-theme-opt]')], i=opts.indexOf(document.activeElement);
+  if(i<0||!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) return;
+  e.preventDefault(); const n=opts[(i+(e.key==='ArrowLeft'||e.key==='ArrowUp'?opts.length-1:1))%opts.length]; n.focus(); n.click();
+});
+if(sysDark){ const onSys=()=>{ if(themePref()==='auto') applyTheme('auto'); }; sysDark.addEventListener?sysDark.addEventListener('change',onSys):sysDark.addListener(onSys); }
+applyTheme(themePref());
 $('checkBtn').onclick=()=>check();
 // Flipping the plates switch after a check re-runs it right away so the card never shows a stale answer.
 $('commercial').addEventListener('change',()=>{ if(!$('resultBody').hidden) check({quiet:true}); });

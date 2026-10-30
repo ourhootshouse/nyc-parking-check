@@ -404,6 +404,26 @@
     return { spothero, parkwhiz, start: win.start, end: win.end, endKnown: win.known, legalAt: win.known ? new Date(i.legalAt) : null };
   }
 
+  // Which garage card to show for a result, and how long to book.
+  //  blocked: can't park now  -> expanded, book until street parking is legal again (okAt)
+  //  soon:    can park, window ends within 2h -> expanded, book until it is legal again after that window (afterOkAt)
+  //  later:   can park for more than 2h (or no end) -> collapsed row, book until the next violation starts
+  function garagePlan(info) {
+    const i = info || {};
+    const now = new Date(i.now || Date.now());
+    const nv = i.nextViolation ? new Date(i.nextViolation) : null;
+    if (!i.canPark) return { mode: 'blocked', expanded: true, until: i.okAt ? new Date(i.okAt) : null };
+    if (nv && nv - now <= 2 * 3600e3) return { mode: 'soon', expanded: true, until: i.afterOkAt ? new Date(i.afterOkAt) : null };
+    return { mode: 'later', expanded: false, until: nv };
+  }
+  // Theme preference ('auto' | 'light' | 'dark') -> the mode to paint and the browser bar colour.
+  const THEME_COLORS = { light: '#f2f3f7', dark: '#000000' };
+  function themeFor(pref, systemDark) {
+    pref = pref === 'light' || pref === 'dark' ? pref : 'auto';
+    const mode = pref === 'auto' ? (systemDark ? 'dark' : 'light') : pref;
+    return { pref, mode, color: THEME_COLORS[mode] };
+  }
+
   function shareSummary(info) {
     const lines = ['ParkHero — NYC parking sign checker'];
     if (info.verdictLine) lines.push(info.verdictLine);
@@ -444,7 +464,7 @@
     expandCityDescription, isLocator, compassRelative, signsForSlot,
     estimatePinDistance, groupPoles, pickFrontBehind,
     encodeState, decodeState, encodeStateV2, decodeStateV2, shareHash, stateFromHash,
-    whenText, vehicleMatters, friendlyRule, signSummary, tidyAddress, shareText, garageWindow, garageLinks, nyLocalMinute, nyIsoOffset, shareSummary, icsEvent
+    whenText, vehicleMatters, friendlyRule, signSummary, tidyAddress, shareText, garageWindow, garageLinks, garagePlan, themeFor, nyLocalMinute, nyIsoOffset, shareSummary, icsEvent
   };
   if (typeof module !== 'undefined') module.exports = api; else root.NYCSigns = api;
 })(this);

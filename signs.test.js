@@ -342,3 +342,49 @@ test('garageLinks appends affiliate IDs only when set', () => {
   assert.ok(pref.spothero.startsWith('https://spothero.pxf.io/c/1/2/3?u=https%3A%2F%2Fspothero.com%2Fsearch%3F'));
   assert.equal(new URL(pref.parkwhiz).searchParams.get('pwa'), null);
 });
+
+test('garagePlan: expanded when blocked or under 2h, collapsed otherwise', () => {
+  const ev = (t, now) => NYC.evaluate(NYC.parse(t).rules, now, {}, { commercial: false });
+  const plan = (t, now) => { const r = ev(t, now); return Signs.garagePlan({ canPark: r.canPark, nextViolation: r.nextViolation, okAt: r.okAt, now }); };
+  // Fri 10:15 AM under NO PARKING 7AM-7PM: blocked, book until 7 PM
+  let now = new Date('2026-10-30T10:15:00-04:00');
+  let p = plan('NO PARKING 7AM-7PM EXCEPT SUNDAY', now);
+  assert.equal(p.mode, 'blocked'); assert.equal(p.expanded, true);
+  assert.equal(+p.until, +new Date('2026-10-30T19:00:00-04:00'));
+  // Fri 6:10 PM under NO PARKING 7PM-10PM: 50 min left -> soon, expanded
+  now = new Date('2026-10-30T18:10:00-04:00');
+  p = Signs.garagePlan({ canPark: true, nextViolation: ev('NO PARKING 7PM-10PM', now).nextViolation, afterOkAt: new Date('2026-10-30T22:00:00-04:00'), now });
+  assert.equal(p.mode, 'soon'); assert.equal(p.expanded, true);
+  assert.equal(+p.until, +new Date('2026-10-30T22:00:00-04:00'));
+  // exactly 2h left still counts as soon
+  p = Signs.garagePlan({ canPark: true, nextViolation: new Date(+now + 2 * 3600e3), now });
+  assert.equal(p.mode, 'soon');
+  // Fri 8:15 PM under NO PARKING 7AM-7PM: fine until Sat 7 AM -> collapsed, window ends at the next violation
+  now = new Date('2026-10-30T20:15:00-04:00');
+  p = plan('NO PARKING 7AM-7PM EXCEPT SUNDAY', now);
+  assert.equal(p.mode, 'later'); assert.equal(p.expanded, false);
+  assert.equal(+p.until, +new Date('2026-10-31T07:00:00-04:00'));
+  const l = Signs.garageLinks({ lat: 40.8, lon: -73.9, now, legalAt: p.until });
+  assert.equal(new URL(l.spothero).searchParams.get('starts'), '2026-10-30T20:15');
+  assert.equal(new URL(l.spothero).searchParams.get('ends'), '2026-10-31T07:00');
+  assert.equal(l.endKnown, true);
+  // no restriction at all: collapsed, no end -> now + 2h
+  p = Signs.garagePlan({ canPark: true, nextViolation: null, now });
+  assert.equal(p.mode, 'later'); assert.equal(p.until, null);
+  const l2 = Signs.garageLinks({ lat: 40.8, lon: -73.9, now, legalAt: p.until });
+  assert.equal(new URL(l2.spothero).searchParams.get('ends'), '2026-10-30T22:15');
+  assert.equal(l2.endKnown, false);
+  // next violation more than 24h away -> now + 2h, rounded to 15 min
+  p = Signs.garagePlan({ canPark: true, nextViolation: new Date(+now + 30 * 3600e3), now: new Date('2026-10-30T20:08:00-04:00') });
+  const l3 = Signs.garageLinks({ lat: 40.8, lon: -73.9, now: new Date('2026-10-30T20:08:00-04:00'), legalAt: p.until });
+  assert.equal(new URL(l3.parkwhiz).searchParams.get('end'), '2026-10-30T22:15:00-04:00');
+});
+
+test('themeFor resolves auto/light/dark and the bar colour', () => {
+  assert.deepEqual(Signs.themeFor('auto', true), { pref: 'auto', mode: 'dark', color: '#000000' });
+  assert.deepEqual(Signs.themeFor('auto', false), { pref: 'auto', mode: 'light', color: '#f2f3f7' });
+  assert.deepEqual(Signs.themeFor('light', true), { pref: 'light', mode: 'light', color: '#f2f3f7' });
+  assert.deepEqual(Signs.themeFor('dark', false), { pref: 'dark', mode: 'dark', color: '#000000' });
+  assert.equal(Signs.themeFor(null, false).pref, 'auto');
+  assert.equal(Signs.themeFor('purple', true).mode, 'dark');
+});
