@@ -105,3 +105,134 @@ test('share link round-trips and the calendar file has the move time', () => {
   assert.match(ics, /DTSTART:20261028T230000Z/);
   assert.match(ics, /SUMMARY:Move the car/);
 });
+
+// ---- v2 short links + friendly share text ----
+const OLD_V1 = 'eyJ2IjoxLCJmcm9udCI6Ik5PIFBBUktJTkcgN0FNLTdQTSBFWENFUFQgU1VOREFZIiwiZnJvbnRBcnJvdyI6InRvd2FyZCIsImJlaGluZCI6IiIsImJlaGluZEFycm93IjoiYXdheSIsImNvbW1lcmNpYWwiOmZhbHNlLCJsYXQiOjQwLjgwOTU0MywibG9uIjotNzMuOTQ3MDE4LCJhY2MiOjE1LCJsYWJlbCI6IjE2NSBXRVNUIDEyNiBTVFJFRVQsIE5ldyBZb3JrLCBOWSwgVVNBIn0';
+
+test('old v1 #p= links still decode', () => {
+  const st = Signs.stateFromHash('#p=' + OLD_V1);
+  assert.equal(st.v, 1);
+  assert.equal(st.front, 'NO PARKING 7AM-7PM EXCEPT SUNDAY');
+  assert.equal(st.behindArrow, 'away');
+  assert.equal(st.lat, 40.809543);
+  assert.equal(st.label, '165 WEST 126 STREET, New York, NY, USA');
+  // percent-encoded variant too
+  assert.equal(Signs.stateFromHash('#p=' + encodeURIComponent(OLD_V1)).front, st.front);
+  assert.equal(Signs.stateFromHash(''), null);
+});
+
+test('v2 short link round-trips and drops defaults', () => {
+  const state = {
+    v: 1,
+    front: 'NO PARKING 7AM-7PM\n\n2 HOUR METERED PARKING 9AM-7PM EXCEPT SUNDAY',
+    frontArrow: 'away',
+    behind: 'NO STANDING W/ ARROW; 8AM-6PM + 100% ~',
+    behindArrow: 'both',
+    commercial: true,
+    lat: 40.8095431234,
+    lon: -73.9470189876,
+    acc: 14,
+    label: '165 WEST 126 STREET, Manhattan, New York, NY, USA'
+  };
+  const hash = Signs.shareHash(state);
+  assert.ok(hash.startsWith('s='));
+  assert.ok(!/label|acc|toward|165/.test(hash), hash);
+  const back = Signs.stateFromHash('#' + hash);
+  assert.deepEqual(back, {
+    v: 2, front: state.front, frontArrow: 'away', behind: state.behind, behindArrow: 'both',
+    commercial: true, lat: 40.80954, lon: -73.94702
+  });
+  // defaults and empty fields are omitted
+  const simple = { front: 'NO PARKING 7AM-7PM EXCEPT SUNDAY', frontArrow: 'toward', behind: '', behindArrow: 'toward', commercial: false, lat: 40.809543, lon: -73.947018 };
+  assert.equal(Signs.shareHash(simple), 's=NO+PARKING+7AM-7PM+EXCEPT+SUNDAY;;;40.80954;-73.94702');
+  assert.equal(Signs.shareHash({ front: 'NO STANDING ANYTIME', frontArrow: 'toward', commercial: false }), 's=NO+STANDING+ANYTIME');
+  const noLoc = Signs.stateFromHash('#s=NO+STANDING+ANYTIME');
+  assert.equal(noLoc.front, 'NO STANDING ANYTIME');
+  assert.equal(noLoc.frontArrow, 'toward');
+  assert.equal(noLoc.lat, undefined);
+  // whole fragment percent-encoded by a messaging app
+  assert.deepEqual(Signs.stateFromHash('#s=' + encodeURIComponent('NO+PARKING+7AM-7PM+EXCEPT+SUNDAY;;;40.80954;-73.94702')), Signs.stateFromHash('#' + Signs.shareHash(simple)));
+  // much shorter than v1
+  assert.ok(Signs.shareHash(simple).length < OLD_V1.length / 3);
+});
+
+test('tidyAddress makes short, friendly addresses', () => {
+  assert.equal(Signs.tidyAddress('165 WEST 126 STREET, Manhattan, New York, NY, USA'), '165 W 126th St, Manhattan');
+  assert.equal(Signs.tidyAddress('165 WEST 126 STREET, New York, NY, USA'), '165 W 126th St, NYC');
+  assert.equal(Signs.tidyAddress('136 West 23 Street, Manhattan, New York, NY, USA'), '136 W 23rd St, Manhattan');
+  assert.equal(Signs.tidyAddress('500 EAST 11 AVENUE, Brooklyn, NY, USA'), '500 E 11th Ave, Brooklyn');
+  assert.equal(Signs.tidyAddress(''), '');
+});
+
+test('friendlyRule speaks plain English', () => {
+  const R = require('./rules.js');
+  const one = t => Signs.friendlyRule(R.parse(t).rules[0]);
+  assert.equal(one('NO PARKING 7AM-7PM EXCEPT SUNDAY'), 'No parking 7 AM to 7 PM, Mon–Sat');
+  assert.equal(one('NO STANDING ANYTIME'), 'No standing anytime');
+  assert.equal(one('2 HOUR METERED PARKING 8AM-7PM MON THRU FRI'), '2-hour metered parking 8 AM to 7 PM, Mon–Fri');
+  assert.match(one('NO PARKING 8:30AM-10AM TUES & FRI'), /no parking 8:30 AM to 10 AM, Tue & Fri$/i);
+});
+
+function sideRules(text, side) {
+  const R = require('./rules.js');
+  return R.parse(text).rules.map(r => Object.assign(r, { side }));
+}
+
+test('share text: CAN park', () => {
+  const text = Signs.shareText({
+    canPark: true,
+    now: new Date('2026-10-29T21:30:00-04:00'),      // Thu 9:30 PM
+    when: new Date('2026-10-30T07:00:00-04:00'),     // Fri 7:00 AM
+    rules: sideRules('NO PARKING 7AM-7PM EXCEPT SUNDAY', 'front'),
+    address: '165 WEST 126 STREET, Manhattan, New York, NY, USA',
+    url: 'https://example.test/#s=abc',
+    linkInText: true
+  });
+  assert.equal(text,
+    '✅ You can park here until 7:00 AM tomorrow (Fri)\n' +
+    '📍 165 W 126th St, Manhattan\n' +
+    'No parking 7 AM to 7 PM, Mon–Sat.\n\n' +
+    'Check it in ParkHero: https://example.test/#s=abc');
+  assert.ok(!/toward|away|←|→|CAN PARK NOW|USA/.test(text));
+});
+
+test('share text: CANNOT park, both signs apply, no link when url passed separately', () => {
+  const text = Signs.shareText({
+    canPark: false,
+    now: new Date('2026-10-30T14:15:00-04:00'),
+    when: new Date('2026-10-30T19:00:00-04:00'),
+    rules: sideRules('NO PARKING 7AM-7PM EXCEPT SUNDAY', 'front').concat(sideRules('2 HOUR METERED PARKING 9AM-7PM EXCEPT SUNDAY', 'behind')),
+    address: '136 West 23 Street, Manhattan, New York, NY, USA',
+    url: 'https://example.test/#s=abc'
+  });
+  assert.equal(text,
+    '🚫 No parking here right now. OK after 7:00 PM today.\n' +
+    '📍 136 W 23rd St, Manhattan\n' +
+    'Front sign: No parking 7 AM to 7 PM, Mon–Sat.\n' +
+    'Back sign: 2-hour metered parking 9 AM to 7 PM, Mon–Sat.');
+  assert.ok(!/example\.test/.test(text));
+  assert.ok(text.split('\n').length <= 4);
+});
+
+test('share text: move soon, empty bits omitted', () => {
+  const text = Signs.shareText({
+    canPark: true,
+    now: new Date('2026-11-03T08:05:00-05:00'),
+    when: new Date('2026-11-03T08:30:00-05:00'),
+    rules: sideRules('NO PARKING 8:30AM-10AM TUES & FRI', 'behind'),
+    address: null
+  });
+  assert.equal(text.split('\n')[0], '⚠️ You can park here, but move by 8:30 AM today (25 min left)');
+  assert.ok(!/📍/.test(text));
+  assert.match(text, /8:30 AM to 10 AM, Tue & Fri\.$/);
+  assert.ok(!/Front sign|Back sign/.test(text));
+});
+
+test('whenText uses relative day words', () => {
+  const now = new Date('2026-10-29T10:00:00-04:00'); // Thu
+  assert.equal(Signs.whenText(new Date('2026-10-29T19:00:00-04:00'), now), '7:00 PM today');
+  assert.equal(Signs.whenText(new Date('2026-10-29T22:00:00-04:00'), now), '10:00 PM tonight');
+  assert.equal(Signs.whenText(new Date('2026-10-30T07:00:00-04:00'), now), '7:00 AM tomorrow (Fri)');
+  assert.equal(Signs.whenText(new Date('2026-11-03T08:00:00-05:00'), now), '8:00 AM on Tuesday');
+  assert.equal(Signs.whenText(new Date('2026-11-09T09:00:00-05:00'), now), '9:00 AM on Mon, Nov 9');
+});

@@ -495,7 +495,7 @@ $('locBtn').onclick=()=>{ if(!navigator.geolocation) return $('loc').textContent
   navigator.geolocation.getCurrentPosition(async pos=>{const {latitude:a,longitude:o,accuracy:acc}=pos.coords;
     place={lat:a,lon:o,acc:acc,label:null};
     setLocHtml(null,a,o,acc);
-    try{const j=await fetch(`https://geosearch.planninglabs.nyc/v2/reverse?point.lat=${a}&point.lon=${o}&size=1`).then(r=>r.json()); const label=j.features&&j.features[0]&&j.features[0].properties.label; if(label){ place.label=label; setLocHtml(label,a,o,acc); }}catch(e){}
+    try{const j=await fetch(`https://geosearch.planninglabs.nyc/v2/reverse?point.lat=${a}&point.lon=${o}&size=1`).then(r=>r.json()); const label=j.features&&j.features[0]&&j.features[0].properties.label; if(label){ place.label=label; place.borough=j.features[0].properties.borough||null; setLocHtml(label,a,o,acc); }}catch(e){}
   },e=>$('loc').textContent='Location error: '+e.message,{enableHighAccuracy:true,timeout:15000});
 };
 // ---- two sign slots ----
@@ -730,7 +730,11 @@ function check(opts){
     verdictLine:r.canPark?'CAN PARK NOW':'CANNOT PARK NOW',
     whenLine:r.canPark?(r.nextViolation?(r.violationIsTimeLimit?'Time limit runs out ':'Violation starts ')+F(r.nextViolation):''):(r.okAt?'OK at '+F(r.okAt):''),
     whenDate:whenDate||null,
-    whenKind:r.canPark?(r.nextViolation?'move':''):(r.okAt?'open':'')
+    whenKind:r.canPark?(r.nextViolation?'move':''):(r.okAt?'open':''),
+    isTimeLimit:!!(r.canPark&&r.violationIsTimeLimit),
+    rules:sides.flatMap(s=>s.rules||[]),
+    commercial:$('commercial').checked,
+    at:now
   };
 }
 $('checkBtn').onclick=()=>check();
@@ -902,14 +906,18 @@ function applyState(state){
   if(state.lat!=null && state.lon!=null){ place={lat:+state.lat, lon:+state.lon, acc:state.acc||null, label:state.label||null}; setLocHtml(place.label, place.lat, place.lon, null); }
   refreshPlaques();
 }
-function shareUrl(){ const u=new URL(location.href); u.hash='p='+NYCSigns.encodeState(currentState()); return u.toString(); }
+function shareUrl(){ const u=new URL(location.href); u.hash=NYCSigns.shareHash(currentState()); return u.toString(); }
+function placeAddress(){ if(!place||!place.label) return ''; const b=place.borough; return place.label+(b&&place.label.toLowerCase().indexOf(b.toLowerCase())<0?', '+b:''); }
+function friendlyText(url, linkInText){
+  return NYCSigns.shareText({canPark:lastCheck.canPark, when:lastCheck.whenDate, isTimeLimit:lastCheck.isTimeLimit, now:new Date(), rules:lastCheck.rules, address:placeAddress(), commercial:lastCheck.commercial, url, linkInText});
+}
 async function onShare(){
   if(!lastCheck){ $('shareStatus').textContent='Check the signs first, then share.'; return; }
   const url=shareUrl();
-  const text=NYCSigns.shareSummary({verdictLine:lastCheck.verdictLine, whenLine:lastCheck.whenLine, address:place&&place.label, front:slots[0].txt.value.trim(), frontArrow:arrowOf(slots[0]), behind:slots[1].txt.value.trim(), behindArrow:arrowOf(slots[1]), commercial:$('commercial').checked, url});
-  if(navigator.share){ try{ await navigator.share({title:'ParkHero', text, url}); $('shareStatus').textContent='Shared.'; return; }catch(e){ if(e&&e.name==='AbortError') return; } }
-  try{ await navigator.clipboard.writeText(text); $('shareStatus').textContent='Copied the summary and link.'; }
-  catch(e){ $('shareStatus').textContent=text; }
+  if(navigator.share){ try{ await navigator.share({title:'ParkHero', text:friendlyText(url,false), url}); $('shareStatus').textContent='Shared.'; return; }catch(e){ if(e&&e.name==='AbortError') return; } }
+  const full=friendlyText(url,true);
+  try{ await navigator.clipboard.writeText(full); $('shareStatus').textContent='Copied the summary and link.'; }
+  catch(e){ $('shareStatus').textContent=full; }
 }
 const SPOTS='nyc-park-spots';
 function readSpots(){ try{ return JSON.parse(localStorage.getItem(SPOTS)||'[]'); }catch(e){ return []; } }
@@ -932,7 +940,7 @@ function onSave(){
 function onIcs(){
   if(!lastCheck||!lastCheck.whenDate){ $('shareStatus').textContent='No move-by or OK-at time to remind you about yet.'; return; }
   const title=lastCheck.whenKind==='move'?'ParkHero: Move the car':'ParkHero: Parking may be OK';
-  const body=NYCSigns.shareSummary({verdictLine:lastCheck.verdictLine, whenLine:lastCheck.whenLine, address:place&&place.label, front:slots[0].txt.value.trim(), behind:slots[1].txt.value.trim()});
+  const body=friendlyText(shareUrl(), true);
   const ics=NYCSigns.icsEvent(lastCheck.whenDate, title, body);
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([ics],{type:'text/calendar'})); a.download='move-the-car.ics'; a.click();
   $('shareStatus').textContent='Downloaded a calendar reminder.';
@@ -1054,11 +1062,11 @@ $('findBtn').onclick=()=>{
   $('findStatus').textContent='Locating…'; $('mapWrap').style.display='block';
   navigator.geolocation.getCurrentPosition(pos=>{
     const {latitude:lat, longitude:lon, accuracy:acc}=pos.coords;
-    place={lat, lon, acc, label:place&&place.label};
+    place={lat, lon, acc, label:place&&place.label, borough:place&&place.borough};
     setLocHtml(null, lat, lon, acc);
     ensureMap(lat, lon, acc);
     lookupSigns(lat, lon, acc);
-    fetch(`https://geosearch.planninglabs.nyc/v2/reverse?point.lat=${lat}&point.lon=${lon}&size=1`).then(r=>r.json()).then(j=>{ const label=j.features&&j.features[0]&&j.features[0].properties.label; if(label){ place.label=label; setLocHtml(label, lat, lon, acc); } }).catch(()=>{});
+    fetch(`https://geosearch.planninglabs.nyc/v2/reverse?point.lat=${lat}&point.lon=${lon}&size=1`).then(r=>r.json()).then(j=>{ const label=j.features&&j.features[0]&&j.features[0].properties.label; if(label){ place.label=label; place.borough=j.features[0].properties.borough||null; setLocHtml(label, lat, lon, acc); } }).catch(()=>{});
   }, err=>{ $('findStatus').textContent='Location error: '+err.message; }, {enableHighAccuracy:true, timeout:15000});
 };
 segmentize($('facePick'));
@@ -1068,8 +1076,15 @@ $('saveBtn').onclick=onSave;
 $('icsBtn').onclick=onIcs;
 renderSpots();
 (function restore(){
-  const m=(location.hash||'').match(/(?:^#|[&#])p=([^&]+)/);
-  if(!m) return;
-  try{ applyState(NYCSigns.decodeState(decodeURIComponent(m[1]))); check(); }catch(e){}
+  let st=null;
+  try{ st=NYCSigns.stateFromHash(location.hash||''); }catch(e){ st=null; }
+  if(!st) return;
+  try{
+    applyState(st); check();
+    if(place && !place.label && place.lat!=null){
+      const lat=place.lat, lon=place.lon;
+      fetch(`https://geosearch.planninglabs.nyc/v2/reverse?point.lat=${lat}&point.lon=${lon}&size=1`).then(r=>r.json()).then(j=>{ const label=j.features&&j.features[0]&&j.features[0].properties.label; if(label&&place&&place.lat===lat&&place.lon===lon){ place.label=label; place.borough=j.features[0].properties.borough||null; setLocHtml(label, lat, lon, place.acc); } }).catch(()=>{});
+    }
+  }catch(e){}
 })();
 </script></body></html>
