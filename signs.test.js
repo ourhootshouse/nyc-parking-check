@@ -271,3 +271,74 @@ test('share text names the vehicle only when the sign cares', () => {
   const plain = Signs.shareText({ canPark: false, now, when: new Date('2026-10-30T19:00:00-04:00'), rules: rules('NO PARKING 7AM-7PM'), commercial: true });
   assert.ok(!/commercial|passenger/i.test(plain), plain);
 });
+
+// ---- garage referral links ----
+test('garageWindow: until legal again, else now + 2h', () => {
+  const now = new Date('2026-10-30T10:15:22-04:00');
+  let w = Signs.garageWindow(now, new Date('2026-10-30T19:00:00-04:00'));
+  assert.equal(w.known, true);
+  assert.equal(w.start.toISOString(), '2026-10-30T14:15:00.000Z');
+  assert.equal(w.end.toISOString(), '2026-10-30T23:00:00.000Z');
+  w = Signs.garageWindow(now, null);
+  assert.equal(w.known, false);
+  assert.equal(w.end.toISOString(), '2026-10-30T16:15:00.000Z');
+  w = Signs.garageWindow(now, new Date('2026-11-01T10:00:00-05:00')); // > 24h away
+  assert.equal(w.known, false);
+  assert.equal(w.end - w.start, 2 * 3600e3);
+  w = Signs.garageWindow(now, new Date('2026-10-30T10:00:00-04:00')); // already past
+  assert.equal(w.known, false);
+  w = Signs.garageWindow(now, new Date('2026-10-30T10:40:00-04:00')); // too short: at least 1h
+  assert.equal(w.end.toISOString(), '2026-10-30T15:15:00.000Z');
+  w = Signs.garageWindow(now, new Date('2026-10-30T13:05:00-04:00')); // rounds up to 15 min
+  assert.equal(w.end.toISOString(), '2026-10-30T17:15:00.000Z');
+});
+
+test('garageLinks builds prefilled SpotHero and ParkWhiz searches', () => {
+  const links = Signs.garageLinks({
+    lat: 40.809543, lon: -73.947018,
+    address: '165 WEST 126 STREET, New York, NY, USA, Manhattan',
+    now: new Date('2026-10-30T10:15:22-04:00'),
+    legalAt: new Date('2026-10-30T19:00:00-04:00'),
+    affiliate: { spothero: '', parkwhiz: '' }
+  });
+  const sh = new URL(links.spothero);
+  assert.equal(sh.origin + sh.pathname, 'https://spothero.com/search');
+  assert.equal(sh.searchParams.get('latitude'), '40.80954');
+  assert.equal(sh.searchParams.get('longitude'), '-73.94702');
+  assert.equal(sh.searchParams.get('starts'), '2026-10-30T10:15');
+  assert.equal(sh.searchParams.get('ends'), '2026-10-30T19:00');
+  assert.equal(sh.searchParams.get('search_string'), '165 W 126th St, Manhattan, NY');
+  const pw = new URL(links.parkwhiz);
+  assert.equal(pw.origin + pw.pathname, 'https://www.parkwhiz.com/destination/Parking-Near-165-W-126th-St/');
+  assert.equal(pw.searchParams.get('lat'), '40.80954');
+  assert.equal(pw.searchParams.get('lng'), '-73.94702');
+  assert.equal(pw.searchParams.get('start'), '2026-10-30T10:15:00-04:00');
+  assert.equal(pw.searchParams.get('end'), '2026-10-30T19:00:00-04:00');
+  // no affiliate params when IDs are empty
+  assert.ok(!/pwa=|aff_id|app\.link/.test(links.spothero + links.parkwhiz));
+  assert.equal(links.endKnown, true);
+});
+
+test('garageLinks: winter offset, no address, no location', () => {
+  const links = Signs.garageLinks({ lat: 40.7, lon: -74, now: new Date('2026-12-01T17:00:00Z'), legalAt: null });
+  const pw = new URL(links.parkwhiz);
+  assert.ok(pw.pathname.startsWith('/destination/NYC-Parking/'));
+  assert.equal(pw.searchParams.get('start'), '2026-12-01T12:00:00-05:00');
+  assert.equal(pw.searchParams.get('end'), '2026-12-01T14:00:00-05:00');
+  assert.equal(new URL(links.spothero).searchParams.get('search_string'), null);
+  assert.equal(Signs.garageLinks({ lat: null, lon: null, now: new Date() }), null);
+});
+
+test('garageLinks appends affiliate IDs only when set', () => {
+  const base = { lat: 40.80954, lon: -73.94702, now: new Date('2026-10-30T10:15:00-04:00'), legalAt: null };
+  const l = Signs.garageLinks(Object.assign({ affiliate: { spothero: '1234', parkwhiz: 'pa-23' } }, base));
+  assert.equal(new URL(l.parkwhiz).searchParams.get('pwa'), 'pa-23');
+  const sh = new URL(l.spothero);
+  assert.equal(sh.hostname, 'spothero.app.link');
+  assert.match(sh.searchParams.get('$affiliate_json'), /aff_id=1234/);
+  assert.equal(sh.searchParams.get('latitude'), '40.80954');
+  assert.equal(sh.searchParams.get('starts'), '2026-10-30T10:15');
+  const pref = Signs.garageLinks(Object.assign({ affiliate: { spothero: 'https://spothero.pxf.io/c/1/2/3?u=' } }, base));
+  assert.ok(pref.spothero.startsWith('https://spothero.pxf.io/c/1/2/3?u=https%3A%2F%2Fspothero.com%2Fsearch%3F'));
+  assert.equal(new URL(pref.parkwhiz).searchParams.get('pwa'), null);
+});

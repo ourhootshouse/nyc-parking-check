@@ -326,6 +326,84 @@
     return out;
   }
 
+  // ---- garage referral links (SpotHero / ParkWhiz) ----
+  // Wall-clock parts of a Date in New York, plus that moment's UTC offset in minutes.
+  function nyWall(d) {
+    const p = {};
+    for (const x of new Intl.DateTimeFormat('en-US', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(d))) p[x.type] = x.value;
+    const y = +p.year, mo = +p.month, da = +p.day, h = (+p.hour) % 24, mi = +p.minute, s = +p.second;
+    const asUtc = Date.UTC(y, mo - 1, da, h, mi, s);
+    const offset = Math.round((asUtc - Math.floor(new Date(d).getTime() / 1000) * 1000) / 60000);
+    return { y, mo, da, h, mi, offset };
+  }
+  const p2 = n => String(n).padStart(2, '0');
+  // "2026-10-30T10:15" in New York local time (SpotHero's own search links use this form).
+  function nyLocalMinute(d) {
+    const w = nyWall(d);
+    return w.y + '-' + p2(w.mo) + '-' + p2(w.da) + 'T' + p2(w.h) + ':' + p2(w.mi);
+  }
+  // "2026-10-30T10:15:00-04:00" (ParkWhiz wants an explicit offset).
+  function nyIsoOffset(d) {
+    const w = nyWall(d), o = w.offset, sign = o < 0 ? '-' : '+', a = Math.abs(o);
+    return nyLocalMinute(d) + ':00' + sign + p2(Math.floor(a / 60)) + ':' + p2(a % 60);
+  }
+  // Booking window: from now until street parking is legal again.
+  // Falls back to now + 2h when that time is unknown, already past, or more than 24h away.
+  // Never shorter than 1 hour, and the end is rounded up to the next 15 minutes.
+  function garageWindow(now, legalAt) {
+    const start = new Date(Math.floor(new Date(now).getTime() / 60000) * 60000);
+    const H = 3600e3;
+    let end, known = false;
+    const t = legalAt ? new Date(legalAt).getTime() : NaN;
+    if (isFinite(t) && t > start.getTime() && t - start.getTime() <= 24 * H) { end = t; known = true; }
+    else end = start.getTime() + 2 * H;
+    if (end - start.getTime() < H) end = start.getTime() + H;
+    const q = 15 * 60000;
+    end = Math.ceil(end / q) * q;
+    return { start, end: new Date(end), known };
+  }
+  function slugTitle(address) {
+    const street = String(tidyAddress(address) || '').split(',')[0];
+    const words = street.replace(/[^A-Za-z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean)
+      .map(w => /^\d/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1));
+    return words.length ? 'Parking-Near-' + words.join('-') : 'NYC-Parking';
+  }
+  // Wrap a SpotHero URL with an affiliate id/link when one is configured.
+  //  - plain id (e.g. "1234"): SpotHero's HasOffers affiliate link via its Branch deep link (format seen on partner sites)
+  //  - full tracking-link prefix (starts with http, e.g. an impact.com link ending in "?u=" or similar): destination is appended URL-encoded
+  function spotHeroAffiliate(url, aff) {
+    aff = String(aff || '').trim();
+    if (!aff) return url;
+    if (/^https?:\/\//i.test(aff)) return aff + encodeURIComponent(url);
+    const tracking = 'http://tracking.spothero.com/aff_c?offer_id=1&aff_id=' + encodeURIComponent(aff) + '&source=parkhero&format=json';
+    return 'https://spothero.app.link/ts1p2NqSe1?%243p=a_hasoffers&%24affiliate_json=' + encodeURIComponent(tracking) + '&' + url.split('?')[1];
+  }
+  // Build both partner search links. info: { lat, lon, address, now, legalAt, affiliate:{spothero, parkwhiz} }
+  function garageLinks(info) {
+    const i = info || {};
+    if (i.lat == null || i.lon == null || !isFinite(i.lat) || !isFinite(i.lon)) return null;
+    const lat = round5(i.lat), lon = round5(i.lon);
+    const win = garageWindow(i.now || new Date(), i.legalAt);
+    const aff = i.affiliate || {};
+    const addr = tidyAddress(i.address);
+    const sh = new URLSearchParams();
+    sh.set('kind', 'address');
+    sh.set('latitude', String(lat));
+    sh.set('longitude', String(lon));
+    if (addr) sh.set('search_string', addr.replace(/, NYC$/, ', New York') + ', NY');
+    sh.set('starts', nyLocalMinute(win.start));
+    sh.set('ends', nyLocalMinute(win.end));
+    const spothero = spotHeroAffiliate('https://spothero.com/search?' + sh.toString(), aff.spothero);
+    const pw = new URLSearchParams();
+    pw.set('lat', String(lat));
+    pw.set('lng', String(lon));
+    pw.set('start', nyIsoOffset(win.start));
+    pw.set('end', nyIsoOffset(win.end));
+    if (String(aff.parkwhiz || '').trim()) pw.set('pwa', String(aff.parkwhiz).trim());
+    const parkwhiz = 'https://www.parkwhiz.com/destination/' + slugTitle(i.address) + '/?' + pw.toString();
+    return { spothero, parkwhiz, start: win.start, end: win.end, endKnown: win.known, legalAt: win.known ? new Date(i.legalAt) : null };
+  }
+
   function shareSummary(info) {
     const lines = ['ParkHero — NYC parking sign checker'];
     if (info.verdictLine) lines.push(info.verdictLine);
@@ -366,7 +444,7 @@
     expandCityDescription, isLocator, compassRelative, signsForSlot,
     estimatePinDistance, groupPoles, pickFrontBehind,
     encodeState, decodeState, encodeStateV2, decodeStateV2, shareHash, stateFromHash,
-    whenText, vehicleMatters, friendlyRule, signSummary, tidyAddress, shareText, shareSummary, icsEvent
+    whenText, vehicleMatters, friendlyRule, signSummary, tidyAddress, shareText, garageWindow, garageLinks, nyLocalMinute, nyIsoOffset, shareSummary, icsEvent
   };
   if (typeof module !== 'undefined') module.exports = api; else root.NYCSigns = api;
 })(this);
