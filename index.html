@@ -1,107 +1,364 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>ParkHero</title>
+<title>ParkHero · NYC parking sign checker</title>
+<meta name="description" content="Snap a NYC parking sign and find out if you can park there now, and when that changes.">
 <meta name="apple-mobile-web-app-title" content="ParkHero">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#111111">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f2f3f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-:root{--g:#0a7d32;--r:#c62828;--b:#1d4ed8}
-*{box-sizing:border-box}body{margin:0;font-family:-apple-system,system-ui,Segoe UI,Roboto,sans-serif;background:#f4f5f7;color:#111;font-size:17px}
-header{background:#111;color:#fff;padding:14px 16px;font-weight:700;font-size:20px}header small{display:block;font-weight:400;font-size:13px;opacity:.75}
-main{padding:12px;max-width:640px;margin:auto}
-.card{background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px #0002}
-h2{font-size:16px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em;color:#555}
-button,.btn{display:block;width:100%;padding:16px;font-size:18px;font-weight:700;border:0;border-radius:12px;background:var(--b);color:#fff;margin:6px 0;text-align:center;cursor:pointer}
-button.sec{background:#e5e7eb;color:#111}
-textarea{width:100%;min-height:110px;font-size:17px;padding:10px;border-radius:10px;border:1px solid #bbb;font-family:ui-monospace,monospace;text-transform:uppercase}
-select,input{font-size:17px;padding:10px;border-radius:10px;border:1px solid #bbb;width:100%;margin:4px 0;background:#fff}
-.row{display:flex;gap:8px}.row>*{flex:1;min-width:0}
-#verdict{border-radius:14px;padding:18px;color:#fff;display:none}
-#verdict.ok{background:var(--g)}#verdict.no{background:var(--r)}
-#verdict .big{font-size:30px;font-weight:900;margin-bottom:6px}
-#verdict .line{font-size:18px;margin:6px 0}
-.muted{color:#666;font-size:14px}.pill{display:inline-block;background:#eef;border-radius:999px;padding:3px 10px;margin:2px;font-size:14px}
-.asp{padding:10px;border-radius:10px;background:#fff7d6;font-size:15px}
-ul{padding-left:20px;margin:6px 0}li{margin:4px 0;font-size:15px}a{color:var(--b)}
-progress{width:100%;display:none}
-label.ck{display:flex;align-items:center;gap:8px;font-size:15px;margin:6px 0}label.ck input{width:auto}
-.stage{position:relative;width:100%;height:280px;background:#111;border-radius:12px;overflow:hidden;touch-action:none}
-.stage canvas{width:100%;height:100%;display:block}
-.timeWarn{display:none;background:#fde8e8;color:#8a1c1c;border-radius:10px;padding:8px 10px;font-size:14px;margin:6px 0}
-.timelab{font-size:13px;font-weight:700;color:#555;margin-top:6px}
-.timeReadout{font-weight:700;color:#111}
+:root{
+  --brand:#2456F5; --brand-2:#4F7BFF; --btn-a:#3D6BFF; --btn-b:#2050EE; --brand-ink:#fff; --brand-soft:#E9EEFF; --brand-text:#1D46D8;
+  --bg:#F2F3F7; --card:#FFFFFF; --text:#0B1220; --text-2:#5A6372; --text-3:#7C8492;
+  --line:rgba(15,23,42,.09); --fill:#ECEEF2; --fill-2:#E2E5EB;
+  --ok:#0E9F4F; --no:#E0353A; --warn:#F2A20C;
+  --shadow:0 1px 2px rgba(16,24,40,.04),0 6px 20px rgba(16,24,40,.06);
+  --shadow-lg:0 2px 6px rgba(16,24,40,.06),0 18px 40px rgba(16,24,40,.12);
+  --r-xl:24px; --r-lg:18px; --r-md:14px; --r-sm:10px;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --safe-b:env(safe-area-inset-bottom,0px);
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme:dark){:root{
+  --brand:#5B82FF; --brand-2:#7A9BFF; --btn-a:#3F6BFA; --btn-b:#2B55E6; --brand-soft:rgba(91,130,255,.16); --brand-text:#8EA9FF;
+  --bg:#000000; --card:#1C1C1E; --text:#F5F5F7; --text-2:#A7ABB3; --text-3:#8D929B;
+  --line:rgba(255,255,255,.09); --fill:#2C2C2E; --fill-2:#3A3A3C;
+  --shadow:0 0 0 1px rgba(255,255,255,.04); --shadow-lg:0 0 0 1px rgba(255,255,255,.06),0 18px 40px rgba(0,0,0,.5);
+}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font-family:var(--font);background:var(--bg);color:var(--text);font-size:17px;line-height:1.4;-webkit-font-smoothing:antialiased}
+a{color:var(--brand-text)}
+.sprite{position:absolute;width:0;height:0;overflow:hidden}
+.ic{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.muted{color:var(--text-2);font-size:14px}
+[hidden]{display:none!important}
+
+/* App bar */
+.appbar{position:sticky;top:0;z-index:1000;padding-top:env(safe-area-inset-top,0px);background:color-mix(in srgb,var(--bg) 82%,transparent);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--line)}
+.appbar-in{max-width:640px;margin:auto;display:flex;align-items:center;gap:11px;padding:10px 18px}
+.logo{width:36px;height:36px;flex:none;border-radius:9px;box-shadow:0 2px 6px rgba(36,86,245,.35)}
+.brand-name{font-weight:800;font-size:19px;letter-spacing:-.01em;line-height:1.1}
+.brand-sub{font-size:12.5px;color:var(--text-2)}
+
+main{max-width:640px;margin:auto;padding:6px 16px calc(116px + var(--safe-b))}
+.intro{padding:18px 4px 6px}
+.intro h1{font-size:32px;line-height:1.1;letter-spacing:-.025em;margin:0 0 6px;font-weight:800}
+.intro p{margin:0;color:var(--text-2);font-size:16px}
+
+/* ASP banner */
+.asp{display:flex;gap:12px;align-items:flex-start;background:var(--card);border-radius:var(--r-lg);padding:12px 14px 4px;margin:14px 0 4px;box-shadow:var(--shadow)}
+.asp-dot{width:10px;height:10px;border-radius:50%;background:var(--text-3);margin-top:7px;flex:none;box-shadow:0 0 0 4px color-mix(in srgb,currentColor 0%,transparent)}
+.asp.ok .asp-dot{background:var(--ok);box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 18%,transparent)}
+.asp.warn .asp-dot{background:var(--warn);box-shadow:0 0 0 4px color-mix(in srgb,var(--warn) 22%,transparent)}
+.asp-text{flex:1;min-width:0;font-size:15px}
+.asp-next{font-size:13px;color:var(--text-2);margin-top:1px}
+#aspDetails{font-size:14px;color:var(--text-2);padding:0 0 10px}
+
+/* Steps */
+.step{margin-top:26px}
+.step-h{display:flex;gap:12px;align-items:flex-start;margin:0 4px 12px}
+.step-n{width:28px;height:28px;border-radius:50%;background:var(--brand);color:#fff;font-weight:800;font-size:15px;display:grid;place-items:center;flex:none;margin-top:1px}
+.step-h h2,.sec-h h2{margin:0;font-size:22px;letter-spacing:-.015em;font-weight:750}
+.step-h p{margin:2px 0 0;font-size:14.5px;color:var(--text-2)}
+.sec-h{margin:0 4px 10px}
+.card{background:var(--card);border-radius:var(--r-xl);padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.field-l{display:block;font-size:13px;font-weight:600;color:var(--text-2);margin:14px 2px 6px;letter-spacing:.01em}
+.status{font-size:14px;color:var(--text-2);margin:8px 2px}
+.status:empty{display:none}
+.center{text-align:center}
+
+/* Buttons */
+.btn{appearance:none;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:50px;padding:12px 18px;margin:8px 0 0;font:inherit;font-size:17px;font-weight:650;border:0;border-radius:var(--r-md);cursor:pointer;text-align:center;text-decoration:none;transition:transform .12s ease,filter .15s ease,background-color .15s ease}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:linear-gradient(180deg,var(--btn-a),var(--btn-b));color:#fff;box-shadow:0 6px 16px -6px color-mix(in srgb,var(--brand) 70%,transparent)}
+.btn-tinted{background:var(--brand-soft);color:var(--brand-text)}
+.btn-plain{background:var(--fill);color:var(--text)}
+.btn-row{display:flex;gap:8px}.btn-row>.btn{flex:1;font-size:15px;white-space:nowrap;padding:12px 10px}
+.btn-s{appearance:none;font:inherit;font-size:14px;font-weight:650;min-height:44px;padding:8px 14px;border-radius:12px;border:0;background:var(--brand-soft);color:var(--brand-text);cursor:pointer}
+.btn-s.ghost{background:var(--fill);color:var(--text)}
+.icon-btn{appearance:none;border:0;background:var(--fill);color:var(--text-2);width:44px;height:44px;border-radius:12px;display:grid;place-items:center;cursor:pointer}
+button:focus-visible,.tile:focus-within,summary:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px solid color-mix(in srgb,var(--brand) 55%,transparent);outline-offset:2px}
+
+/* Inputs */
+select,input[type=number],textarea{font:inherit;font-size:16px;color:var(--text);background:var(--fill);border:1px solid transparent;border-radius:12px;width:100%;min-height:44px;padding:10px 12px}
+select{appearance:none;-webkit-appearance:none;padding-right:34px;background-image:linear-gradient(45deg,transparent 50%,var(--text-2) 50%),linear-gradient(135deg,var(--text-2) 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat}
+textarea{min-height:110px;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:15px;text-transform:uppercase;resize:vertical}
+.row{display:flex;gap:8px;align-items:center}.row>*{flex:1;min-width:0}
+.row>.seg{flex:1.2}
+
+/* Segmented control */
+.seg{display:flex;background:var(--fill);border-radius:13px;padding:3px;gap:3px}
+.seg label,.seg button{flex:1;position:relative;min-height:40px;display:flex;align-items:center;justify-content:center;gap:4px;font:inherit;font-size:14px;font-weight:600;border:0;background:transparent;border-radius:10px;color:var(--text-2);cursor:pointer;text-align:center;padding:6px 6px;transition:background-color .18s ease,color .18s ease,box-shadow .18s ease;line-height:1.15}
+.seg input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.seg label:has(input:checked),.seg button[aria-checked="true"]{background:var(--card);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.08),0 2px 8px rgba(0,0,0,.08)}
+@media (prefers-color-scheme:dark){.seg label:has(input:checked),.seg button[aria-checked="true"]{background:#636366}}
+.seg label:has(input:focus-visible){outline:3px solid color-mix(in srgb,var(--brand) 55%,transparent)}
+.seg .ar{font-size:15px}
+
+/* Location */
+.loc-row{display:flex;gap:12px;align-items:center;padding:2px 2px 6px}
+.loc-ic{width:40px;height:40px;border-radius:12px;background:var(--brand-soft);color:var(--brand-text);display:grid;place-items:center;flex:none}
+.loc{font-size:15px;color:var(--text-2);min-width:0;overflow-wrap:anywhere}
+.loc b{color:var(--text);font-size:16px}
+.map-frame{border-radius:var(--r-lg);overflow:hidden;margin:14px 0 6px;box-shadow:inset 0 0 0 1px var(--line);background:var(--fill)}
+#map{height:290px;width:100%}
+.leaflet-container{font-family:var(--font)}
+@media (prefers-color-scheme:dark){.leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88)}}
+.ph-pin span{display:block;width:26px;height:26px;border-radius:50%;background:var(--brand);border:4px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.35),0 0 0 8px color-mix(in srgb,var(--brand) 22%,transparent)}
+.leaflet-popup-content-wrapper{border-radius:14px}
+.leaflet-popup-content{font-size:13px;line-height:1.35}
+.list-h{font-size:13px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.05em;margin:18px 2px 6px}
+.pole{display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.pole:first-of-type{border-top:0}
+.pole-d{width:54px;flex:none;background:var(--fill);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 0;align-self:flex-start}
+.pole-d b{font-size:17px;line-height:1.1}.pole-d span{font-size:11px;color:var(--text-2)}
+.pole-b{flex:1;min-width:0}
+.pole-t{font-size:14px;line-height:1.35}
+.pole-t div{background:var(--fill);border-radius:10px;padding:7px 10px;font-size:13px;font-weight:600;letter-spacing:.01em}
+.pole-t div+div{margin-top:6px}
+.pole-a{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+
+/* Sign cards */
+.sign-h{display:flex;align-items:center;gap:10px}
+.sign-badge{width:34px;height:34px;border-radius:10px;background:var(--brand-soft);color:var(--brand-text);display:grid;place-items:center;font-weight:800;font-size:14px;flex:none}
+.sign-h h3{margin:0;font-size:17px;font-weight:700;flex:1}
+.chip{font-size:12px;font-weight:650;padding:4px 9px;border-radius:999px;background:var(--fill);color:var(--text-2)}
+.chip.req{background:var(--brand-soft);color:var(--brand-text)}
+.seg-hint{font-size:13px;color:var(--text-2);margin:6px 2px 0}
+.plaque{margin:14px 0 2px;background:#fff;color:#0d0d0d;border:2px solid #d7dbe2;border-radius:12px;padding:12px 14px;font-weight:800;font-size:14.5px;letter-spacing:.02em;text-transform:uppercase;white-space:pre-wrap;line-height:1.35;box-shadow:0 1px 0 rgba(0,0,0,.04);position:relative}
+.plaque::before{content:"Sign text";display:block;font-size:10.5px;letter-spacing:.08em;color:#6b7280;font-weight:700;margin-bottom:4px}
+.plaque.ignored{opacity:.5}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.tile{appearance:none;font:inherit;border:0;background:var(--fill);color:var(--text);border-radius:var(--r-md);min-height:74px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:13.5px;font-weight:650;cursor:pointer;transition:transform .12s ease,background-color .15s}
+.tile:active{transform:scale(.97)}
+.tile .ic{width:24px;height:24px;color:var(--brand-text)}
+.tile.primary{background:linear-gradient(180deg,var(--btn-a),var(--btn-b));color:#fff}
+.tile.on{background:var(--brand-soft);color:var(--brand-text);box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--brand) 45%,transparent)}
+.sign details.builder:not([open]),.sign details.textBox:not([open]):not(.show){display:none}
+.tile.primary .ic{color:#fff}
 .photo{display:none}
-.arrow label{display:flex;align-items:center;gap:8px;padding:8px 2px;font-size:16px}
-.arrow input{width:auto;margin:0}
-.diagram{width:100%;height:auto;display:block;margin:6px 0}
-#map{height:260px;border-radius:12px;margin:8px 0}
-.spot{border-top:1px solid #eee;padding:8px 0}
-.spot button{display:inline-block;width:auto;padding:8px 12px;font-size:15px;margin:4px 6px 0 0}
-.find-item{border-top:1px solid #eee;padding:8px 0;font-size:15px}
-.find-item button{display:inline-block;width:auto;padding:8px 10px;font-size:14px;margin:4px 6px 0 0}
+.cropBox{margin-top:14px}
+.stage{position:relative;width:100%;height:280px;background:#0b0b0d;border-radius:var(--r-lg);overflow:hidden;touch-action:none}
+.stage canvas{width:100%;height:100%;display:block}
+.zoomRow{display:flex;align-items:center;gap:10px;margin:10px 2px;font-size:14px;color:var(--text-2)}
+.zoomRow input{flex:1;accent-color:var(--brand)}
+progress{width:100%;display:none;height:6px;margin-top:10px;accent-color:var(--brand)}
+.ocrStatus{font-size:14px;color:var(--text-2);margin-top:8px}
+.ocrStatus:empty{display:none}
+details.mini{margin-top:10px;border-top:1px solid var(--line)}
+details.mini>summary,details.fold>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:46px;font-weight:650;font-size:15.5px;cursor:pointer;color:var(--text)}
+details>summary::-webkit-details-marker{display:none}
+details.mini>summary::after,details.fold>summary::after{content:"";width:7px;height:7px;border-right:2px solid var(--text-3);border-bottom:2px solid var(--text-3);transform:rotate(45deg);margin:0 6px 4px 0;transition:transform .2s ease}
+details[open].mini>summary::after,details[open].fold>summary::after{transform:rotate(-135deg);margin-bottom:-2px}
+.sum-l{display:flex;align-items:center;gap:8px}
+.sum-l .ic{color:var(--text-2);width:18px;height:18px}
+details.mini[open]>:not(summary){animation:fade .2s ease}
+.timeWarn{display:none;background:color-mix(in srgb,var(--no) 12%,transparent);color:var(--no);border-radius:12px;padding:8px 12px;font-size:14px;margin:8px 0}
+.timeReadout{font-size:14px;color:var(--text-2);margin:8px 2px}
+.diagram{width:100%;height:auto;display:block;margin:4px 0 8px}
+.switch-row{display:flex;align-items:center;gap:12px;cursor:pointer;min-height:44px}
+.sw-ic{width:40px;height:40px;border-radius:12px;background:var(--fill);display:grid;place-items:center;flex:none;color:var(--text-2)}
+.sw-text{flex:1}.sw-text b{display:block;font-size:16px;font-weight:650}.sw-text small{font-size:13px;color:var(--text-2)}
+input.switch{appearance:none;-webkit-appearance:none;width:51px;height:31px;border-radius:999px;background:var(--fill-2);position:relative;flex:none;cursor:pointer;transition:background-color .2s ease;margin:0}
+input.switch::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.25);transition:transform .22s cubic-bezier(.3,.7,.4,1)}
+input.switch:checked{background:var(--ok)}
+input.switch:checked::after{transform:translateX(20px)}
+
+/* Result */
+.empty{text-align:center;padding:26px 18px;color:var(--text-2)}
+.empty .ic{width:34px;height:34px;color:var(--text-3);margin-bottom:6px}
+.empty b{display:block;color:var(--text);font-size:17px;margin-bottom:2px}
+.verdict{border-radius:26px;padding:20px 20px 16px;color:#fff;position:relative;overflow:hidden;margin-bottom:12px;scroll-margin-top:76px;box-shadow:var(--shadow-lg)}
+.verdict::after{content:"";position:absolute;right:-60px;top:-60px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.10);pointer-events:none}
+.verdict.ok{background:linear-gradient(155deg,#10924A 0%,#066B33 100%)}
+.verdict.no{background:linear-gradient(155deg,#D92D33 0%,#A8161F 100%)}
+.verdict.warn{background:linear-gradient(155deg,#FFC94A 0%,#F59E0B 100%);color:#2B1800}
+.verdict.pop{animation:pop .38s cubic-bezier(.2,.9,.3,1.2)}
+.v-head{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.07em;font-size:13.5px;text-transform:uppercase}
+.v-icon{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.24);display:grid;place-items:center;flex:none}
+.warn .v-icon{background:rgba(43,24,0,.12)}
+.v-icon .ic{width:20px;height:20px;stroke-width:3}
+.v-key{font-size:52px;font-weight:800;letter-spacing:-.03em;line-height:1.02;margin:16px 0 8px;font-variant-numeric:tabular-nums}
+.v-key small{display:block;font-size:20px;font-weight:700;letter-spacing:-.005em;opacity:.92;margin-bottom:2px}
+.v-key.text{font-size:34px}
+.v-when{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:15.5px;font-weight:600}
+.v-count{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.22);padding:5px 11px 5px 9px;border-radius:999px;font-variant-numeric:tabular-nums}
+.warn .v-count{background:rgba(43,24,0,.12)}
+.v-count .ic{width:16px;height:16px}
+.v-lines{list-style:none;margin:16px 0 0;padding:12px 0 0;border-top:1px solid rgba(255,255,255,.28)}
+.warn .v-lines{border-top-color:rgba(43,24,0,.18)}
+.v-lines li{font-size:15px;line-height:1.4;margin:7px 0;padding-left:16px;position:relative}
+.v-lines li::before{content:"";position:absolute;left:2px;top:.6em;width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.7}
+.v-lines li.small{font-size:13.5px;opacity:.9}
+.verdict .big{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:14px 0 6px;line-height:1.1}
+.verdict .line{font-size:15px;margin:8px 0;line-height:1.4}
+.verdict b{font-weight:800}
+.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.act{appearance:none;font:inherit;border:0;background:var(--card);color:var(--brand-text);box-shadow:var(--shadow);border-radius:var(--r-lg);min-height:68px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-size:13.5px;font-weight:650;cursor:pointer;transition:transform .12s ease}
+.act:active{transform:scale(.97)}
+.act .ic{width:22px;height:22px}
+.fold{background:var(--card);border-radius:var(--r-xl);padding:4px 16px;margin:12px 0;box-shadow:var(--shadow)}
+.fold[open]{padding-bottom:14px}
+.pill{display:inline-block;background:var(--brand-soft);color:var(--brand-text);border-radius:10px;padding:6px 10px;margin:4px 0;font-size:14px;font-weight:600}
+#parsed label.ck{display:flex;align-items:center;gap:10px;font-size:14px;margin:6px 0 10px;min-height:36px;color:var(--text-2)}
+#parsed label.ck input{width:20px;height:20px;accent-color:var(--brand)}
+.fold ul{padding-left:20px;margin:4px 0 10px}.fold li{margin:6px 0;font-size:15px}
+.sources{display:flex;flex-wrap:wrap;gap:6px}
+.sources a{font-size:13px;text-decoration:none;background:var(--fill);color:var(--text);padding:7px 10px;border-radius:999px}
+.foot{font-size:13px;color:var(--text-3);margin:14px 6px 0;line-height:1.45}
+
+/* Saved spots */
+.spot{display:flex;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.spot:first-child{border-top:0;padding-top:2px}
+.spot:last-child{padding-bottom:2px}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--text-3);flex:none}
+.dot.ok{background:var(--ok)}.dot.no{background:var(--no)}
+.spot-b{flex:1;min-width:0}
+.spot-v{font-weight:700;font-size:15px}
+.spot-a{font-size:14px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.spot-t{font-size:12.5px;color:var(--text-3)}
+.spot-btns{display:flex;gap:6px;flex:none}
+.empty-s{display:flex;align-items:center;gap:12px;color:var(--text-2);font-size:14.5px}
+.empty-s .ic{color:var(--text-3)}
+
+/* Sticky check bar */
+.checkbar{position:fixed;left:0;right:0;bottom:0;z-index:1100;padding:12px 16px calc(12px + var(--safe-b));background:linear-gradient(to top,var(--bg) 62%,color-mix(in srgb,var(--bg) 0%,transparent))}
+.checkbar .btn{max-width:608px;margin:0 auto;min-height:56px;font-size:18px;border-radius:18px}
+.checkbar .ic{width:22px;height:22px;stroke-width:2.6}
+
+@keyframes pop{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:360px){.v-key{font-size:44px}.intro h1{font-size:28px}}
 </style></head><body>
-<header>ParkHero <small>NYC parking sign checker</small></header>
+<svg class="sprite" aria-hidden="true" focusable="false"><defs>
+ <linearGradient id="phg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5B86FF"/><stop offset="1" stop-color="#1B3FD4"/></linearGradient>
+ <symbol id="ph-logo" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="url(#phg)"/><path d="M32 9 50.5 15.2V29.5C50.5 41.4 42.6 50.3 32 54.6 21.4 50.3 13.5 41.4 13.5 29.5V15.2Z" fill="#fff"/><path fill="#2456F5" fill-rule="evenodd" d="M24.5 18.5h10a8.75 8.75 0 0 1 0 17.5H31v8h-6.5zM31 24.3v6h3.3a3 3 0 0 0 0-6z"/></symbol>
+ <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
+ <symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></symbol>
+ <symbol id="i-locate" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></symbol>
+ <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></symbol>
+ <symbol id="i-type" viewBox="0 0 24 24"><path d="M4 7V5h16v2M9 19h6M12 5v14"/></symbol>
+ <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h9M19 6h1M4 12h3M13 12h7M4 18h11M21 18h-1"/><circle cx="16" cy="6" r="2.5"/><circle cx="10" cy="12" r="2.5"/><circle cx="18" cy="18" r="2.5"/></symbol>
+ <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></symbol>
+ <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4.5L6 21z"/></symbol>
+ <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></symbol>
+ <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+ <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+ <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 7v6M12 17h.01"/></symbol>
+ <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+ <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></symbol>
+ <symbol id="i-car" viewBox="0 0 24 24"><path d="M3.5 16.5V12l2.2-5.2A2 2 0 0 1 7.5 5.5h9a2 2 0 0 1 1.8 1.3L20.5 12v4.5z"/><path d="M3.5 12h17"/><circle cx="7.5" cy="16.5" r="1.8"/><circle cx="16.5" cy="16.5" r="1.8"/></symbol>
+ <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+ <symbol id="i-bookopen" viewBox="0 0 24 24"><path d="M3 5h6a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H3zM21 5h-6a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h7z"/></symbol>
+ <symbol id="i-arrows" viewBox="0 0 24 24"><path d="M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4"/></symbol>
+</defs></svg>
+
+<header class="appbar"><div class="appbar-in">
+ <svg class="logo" viewBox="0 0 64 64" role="img" aria-label="ParkHero logo"><use href="#ph-logo"/></svg>
+ <div><div class="brand-name">ParkHero</div><div class="brand-sub">NYC parking sign checker</div></div>
+</div></header>
+
 <main>
-<div class="card"><h2>1 · Location</h2>
- <button id="locBtn">📍 Use my location</button>
- <div id="loc" class="muted">Not set</div>
- <button type="button" id="findBtn">🗺 Find signs near me</button>
- <div id="mapWrap" style="display:none">
-  <div id="map"></div>
-  <p class="muted">GPS is often off between tall buildings. The city file is usually a sign pole, but some blocks reuse one point for every sign, and posted signs change before the data does. A photo of the real sign wins.</p>
-  <label class="timelab">Block side</label>
-  <select id="sidePick"></select>
-  <label class="timelab">Front of my car points toward</label>
-  <select id="facePick"></select>
-  <button type="button" class="sec" id="fillBtn">Use the nearest signs on this side</button>
-  <div id="findStatus" class="muted"></div>
-  <div id="findItems"></div>
+<section class="intro">
+ <h1>Can I park here?</h1>
+ <p>Find or snap the signs on your block. ParkHero tells you straight, and when that changes.</p>
+</section>
+
+<div id="aspBox" class="asp">
+ <span class="asp-dot" aria-hidden="true"></span>
+ <div class="asp-text">
+  <div id="aspStatus">Checking today's Alternate Side Parking…</div>
+  <details class="mini" id="aspMore" style="border-top:0;margin-top:0"><summary style="min-height:40px;font-size:14px;color:var(--brand-text)">ASP details</summary><div id="aspDetails"></div></details>
  </div>
- <div id="aspBox" class="asp" style="margin-top:8px">Loading today's Alternate Side Parking status…</div>
 </div>
 
-<div class="card">
- <h2>Which way does the arrow point?</h2>
- <svg class="diagram" viewBox="0 0 320 78" role="img" aria-label="A car, then an arrow toward a sign pole, then an arrow away from it.">
-  <rect x="8" y="28" width="48" height="26" rx="6" fill="#111"/>
-  <text x="32" y="45" text-anchor="middle" fill="#fff" font-size="12" font-family="system-ui,sans-serif">car</text>
-  <line x1="66" y1="40" x2="118" y2="40" stroke="#0a7d32" stroke-width="4"/>
-  <polygon points="66,40 80,32 80,48" fill="#0a7d32"/>
-  <text x="92" y="22" text-anchor="middle" fill="#0a7d32" font-size="11" font-family="system-ui,sans-serif">toward car</text>
-  <rect x="132" y="14" width="52" height="32" rx="3" fill="#fff" stroke="#c62828" stroke-width="2"/>
-  <text x="158" y="34" text-anchor="middle" fill="#c62828" font-size="11" font-family="system-ui,sans-serif">SIGN</text>
-  <line x1="158" y1="46" x2="158" y2="72" stroke="#333" stroke-width="4"/>
-  <line x1="196" y1="40" x2="250" y2="40" stroke="#c62828" stroke-width="4"/>
-  <polygon points="262,40 248,32 248,48" fill="#c62828"/>
-  <text x="236" y="22" text-anchor="middle" fill="#c62828" font-size="11" font-family="system-ui,sans-serif">away</text>
- </svg>
- <p class="muted">On an NYC sign, the arrow shows which side of the pole the rule covers. Pick that direction relative to your car. No arrow means it applies both ways. A sign pointing away is not used.</p>
-</div>
-<div id="signList"></div>
+<section class="step" id="step1">
+ <div class="step-h"><span class="step-n">1</span><div><h2>Where are you?</h2><p>Pull the posted signs for your block from NYC's sign map.</p></div></div>
+ <div class="card">
+  <div class="loc-row"><span class="loc-ic"><svg class="ic"><use href="#i-pin"/></svg></span><div id="loc" class="loc">Location not set yet</div></div>
+  <button type="button" class="btn btn-primary" id="findBtn"><svg class="ic"><use href="#i-map"/></svg>Find signs near me</button>
+  <button type="button" class="btn btn-tinted" id="locBtn"><svg class="ic"><use href="#i-locate"/></svg>Just use my location</button>
+  <div id="mapWrap" style="display:none">
+   <div class="map-frame"><div id="map" aria-label="Map of nearby parking signs"></div></div>
+   <div id="findStatus" class="status"></div>
+   <label class="field-l" for="sidePick">Block side</label>
+   <select id="sidePick"></select>
+   <div class="field-l">Front of my car points toward</div>
+   <select id="facePick" aria-label="Front of my car points toward"></select>
+   <button type="button" class="btn btn-tinted" id="fillBtn">Use the nearest signs on this side</button>
+   <details class="mini"><summary><span class="sum-l"><svg class="ic"><use href="#i-info"/></svg>About map accuracy</span></summary>
+    <p class="muted" style="margin:0 0 8px">GPS is often off between tall buildings, so drag the pin if it's in the wrong spot. The city file is usually one point per sign pole, but some blocks reuse one point for every sign, and posted signs change before the data does. A photo of the real sign wins.</p>
+   </details>
+   <div id="findItems"></div>
+  </div>
+ </div>
+</section>
+
+<section class="step" id="step2">
+ <div class="step-h"><span class="step-n">2</span><div><h2>Signs</h2><p>The sign in front of your car, plus the one behind it if there is one.</p></div></div>
+ <details class="fold"><summary><span class="sum-l"><svg class="ic"><use href="#i-arrows"/></svg>How do sign arrows work?</span></summary>
+  <svg class="diagram" viewBox="0 0 320 78" role="img" aria-label="A car, then an arrow toward a sign pole, then an arrow away from it.">
+   <rect x="8" y="28" width="48" height="26" rx="7" style="fill:var(--text)"/>
+   <text x="32" y="45" text-anchor="middle" style="fill:var(--card)" font-size="12" font-weight="700" font-family="system-ui,sans-serif">car</text>
+   <line x1="70" y1="40" x2="118" y2="40" stroke="#0E9F4F" stroke-width="4" stroke-linecap="round"/>
+   <polygon points="66,40 80,32 80,48" fill="#0E9F4F"/>
+   <text x="94" y="22" text-anchor="middle" fill="#0E9F4F" font-size="11" font-weight="700" font-family="system-ui,sans-serif">toward car</text>
+   <rect x="132" y="12" width="52" height="34" rx="4" fill="#fff" stroke="#E0353A" stroke-width="2"/>
+   <text x="158" y="33" text-anchor="middle" fill="#E0353A" font-size="11" font-weight="800" font-family="system-ui,sans-serif">SIGN</text>
+   <line x1="158" y1="46" x2="158" y2="74" style="stroke:var(--text-2)" stroke-width="4"/>
+   <line x1="196" y1="40" x2="248" y2="40" stroke="#E0353A" stroke-width="4" stroke-linecap="round"/>
+   <polygon points="262,40 248,32 248,48" fill="#E0353A"/>
+   <text x="232" y="22" text-anchor="middle" fill="#E0353A" font-size="11" font-weight="700" font-family="system-ui,sans-serif">away</text>
+  </svg>
+  <p class="muted" style="margin:0">On an NYC sign, the arrow shows which side of the pole the rule covers. Pick that direction relative to your car. No arrow means it applies both ways. A sign pointing away is not used.</p>
+ </details>
+ <div id="signList"></div>
+ <div class="card">
+  <label class="switch-row"><span class="sw-ic"><svg class="ic"><use href="#i-car"/></svg></span><span class="sw-text"><b>Commercial plates</b><small>Turn on if your vehicle has commercial plates</small></span><input type="checkbox" id="commercial" class="switch" role="switch"></label>
+ </div>
+</section>
+
 <template id="signTpl">
 <div class="card sign">
- <h2 class="signTitle"></h2>
- <div class="arrow" role="radiogroup">
-  <label><input type="radio" value="toward" checked> Points toward my car</label>
-  <label><input type="radio" value="away"> Points away from my car</label>
-  <label><input type="radio" value="both"> No arrow (both ways)</label>
+ <div class="sign-h"><span class="sign-badge"></span><h3 class="signTitle"></h3><span class="chip signChip"></span></div>
+ <div class="field-l">Which way does its arrow point?</div>
+ <div class="seg arrow" role="radiogroup" aria-label="Arrow direction">
+  <label><input type="radio" value="toward" checked><span><span class="ar" aria-hidden="true">←</span> Toward car</span></label>
+  <label><input type="radio" value="away"><span>Away <span class="ar" aria-hidden="true">→</span></span></label>
+  <label><input type="radio" value="both"><span><span class="ar" aria-hidden="true">↔</span> No arrow</span></label>
  </div>
- <label class="btn">📷 Snap / upload sign<input class="photo" type="file" accept="image/*" capture="environment"></label>
+ <div class="plaque" hidden></div>
+ <div class="tiles">
+  <label class="tile primary"><svg class="ic"><use href="#i-camera"/></svg><span>Snap photo</span><input class="photo" type="file" accept="image/*" capture="environment"></label>
+  <button type="button" class="tile typeBtn"><svg class="ic"><use href="#i-type"/></svg><span>Type it</span></button>
+  <button type="button" class="tile buildBtn"><svg class="ic"><use href="#i-sliders"/></svg><span>Build it</span></button>
+ </div>
  <div class="cropBox" style="display:none">
   <div class="stage"><canvas></canvas></div>
-  <label class="muted">Zoom <input class="zoom" type="range" min="1" max="6" step="0.05" value="1"></label>
-  <div class="muted">Drag the photo so the sign fills the blue frame. Pinch or use the slider if the sign is small. The arrow itself is not read — set it above.</div>
-  <button type="button" class="readBtn">Read sign in the frame</button>
-  <button type="button" class="sec readFullBtn">Read the whole photo instead</button>
-  <button type="button" class="sec resetFrame">Reset zoom</button>
+  <label class="zoomRow">Zoom <input class="zoom" type="range" min="1" max="6" step="0.05" value="1"></label>
+  <div class="muted">Drag the photo so the sign fills the blue frame. Pinch or use the slider if the sign is small. The arrow itself isn't read, so set it above.</div>
+  <button type="button" class="btn btn-primary readBtn">Read sign in the frame</button>
+  <div class="btn-row">
+   <button type="button" class="btn btn-plain readFullBtn">Read whole photo</button>
+   <button type="button" class="btn btn-plain resetFrame">Reset zoom</button>
+  </div>
  </div>
  <progress max="1" value="0"></progress>
- <div class="ocrStatus muted"></div>
- <textarea class="txt" placeholder="Type the sign, or use the builder below"></textarea>
- <details class="builder"><summary class="muted">Or build a sign quickly</summary>
+ <div class="ocrStatus"></div>
+ <details class="mini textBox"><summary class="textSum">Type or edit the sign text</summary>
+  <textarea class="txt" placeholder="e.g. NO PARKING 8AM-11AM TUES"></textarea>
+ </details>
+ <details class="mini builder"><summary>Build a sign quickly</summary>
+  <label class="field-l" style="margin-top:2px">Sign type</label>
   <select class="pType">
    <option value="NO PARKING">No Parking</option>
    <option value="STREET CLEANING NO PARKING">Street cleaning / alternate side (broom)</option>
@@ -115,67 +372,82 @@ label.ck{display:flex;align-items:center;gap:8px;font-size:15px;margin:6px 0}lab
    <option value="METERED COMMERCIAL">Metered parking, commercial vehicles only</option>
   </select>
   <div class="pHoursRow" style="display:none">
-   <label class="timelab">Hour limit</label>
+   <label class="field-l">Hour limit</label>
    <input class="pHours" type="number" min="1" max="12" step="1" value="3" inputmode="numeric">
   </div>
-  <label class="ck"><input type="checkbox" class="pAny"> Anytime</label>
+  <label class="switch-row" style="margin-top:10px"><span class="sw-text"><b style="font-size:15px">Anytime</b></span><input type="checkbox" class="pAny switch" role="switch"></label>
   <div class="timeFields">
-   <div class="timelab">Start</div>
+   <div class="field-l">Starts</div>
    <div class="row">
     <select class="pFromH" aria-label="Start hour"></select>
     <select class="pFromM" aria-label="Start minutes"></select>
     <select class="pFromAP" aria-label="Start AM or PM"><option>AM</option><option>PM</option></select>
    </div>
-   <div class="timelab">End</div>
+   <div class="field-l">Ends</div>
    <div class="row">
     <select class="pToH" aria-label="End hour"></select>
     <select class="pToM" aria-label="End minutes"></select>
     <select class="pToAP" aria-label="End AM or PM"><option>AM</option><option>PM</option></select>
    </div>
   </div>
-  <div class="timeReadout muted"></div>
+  <div class="timeReadout"></div>
   <div class="timeWarn"></div>
+  <label class="field-l">Days</label>
   <select class="pDays">
    <option value="">Every day</option><option>EXCEPT SUNDAY</option><option>MON-FRI</option><option>MON-SAT</option>
    <option>MON</option><option>TUES</option><option>WED</option><option>THURS</option><option>FRI</option><option>SAT</option>
    <option>MON & THURS</option><option>TUES & FRI</option>
   </select>
-  <button type="button" class="sec addBtn">➕ Add this sign</button>
+  <button type="button" class="btn btn-tinted addBtn">Add this sign</button>
  </details>
 </div>
 </template>
-<div class="card">
- <label class="ck"><input type="checkbox" id="commercial"> My vehicle has commercial plates</label>
- <button type="button" id="checkBtn">✅ Can I park here now?</button>
- <button type="button" class="sec" id="shareBtn">Share this result</button>
- <button type="button" class="sec" id="saveBtn">Save this spot</button>
- <button type="button" class="sec" id="icsBtn">Remind me (.ics)</button>
- <div id="shareStatus" class="muted"></div>
-</div>
-<div class="card"><h2>My saved spots</h2><div id="savedList" class="muted">None yet.</div></div>
 
-<div id="verdict"></div>
-<div class="card" id="parsedCard" style="display:none"><h2>How I read the signs</h2><div id="parsed"></div></div>
-
-<div class="card"><h2>Citywide rules (no sign needed)</h2>
- <ul>
-  <li>No parking within <b>15 ft of a fire hydrant</b> (even if unmarked).</li>
-  <li>Don't block <b>crosswalks</b>, <b>sidewalks</b>, or <b>driveways</b> (including your host's).</li>
-  <li>No standing at <b>bus stops</b>, or double parking.</li>
-  <li>Meters: pay with the <b>ParkNYC</b> app or the muni-meter; they are suspended on major legal holidays.</li>
-  <li>Street cleaning (broom) rules are suspended on ASP holidays; other signs usually still apply.</li>
- </ul>
- <div class="muted">Official sources:
-  <a href="https://www.nyc.gov/html/dot/html/motorist/parking.shtml" target="_blank">NYC DOT Parking</a> ·
-  <a href="https://www.nyc.gov/html/dot/html/motorist/signs.shtml" target="_blank">DOT parking sign guide</a> ·
-  <a href="https://www.nyc.gov/site/finance/vehicles/services-violation-codes.page" target="_blank">DOF violation codes</a> ·
-  <a href="https://www.nyc.gov/html/dot/html/motorist/alternate-side-parking.shtml" target="_blank">ASP calendar</a> ·
-  <a href="https://portal.311.nyc.gov/article/?kanumber=KA-01011" target="_blank">311 ASP</a> ·
-  <a href="https://www.nyc.gov/html/dot/html/motorist/parknyc.shtml" target="_blank">ParkNYC</a>
+<section class="step" id="step3">
+ <div class="step-h"><span class="step-n">3</span><div><h2>Result</h2></div></div>
+ <div id="resultEmpty" class="card empty"><svg class="ic"><use href="#i-car"/></svg><b>Your answer shows up here</b>Add a sign, then tap <b style="display:inline;font-size:inherit">Check parking</b>.</div>
+ <div id="resultBody" hidden>
+  <div id="verdict" class="verdict" role="status" aria-live="polite"></div>
+  <div class="actions">
+   <button type="button" class="act" id="shareBtn"><svg class="ic"><use href="#i-share"/></svg>Share</button>
+   <button type="button" class="act" id="saveBtn"><svg class="ic"><use href="#i-bookmark"/></svg>Save spot</button>
+   <button type="button" class="act" id="icsBtn"><svg class="ic"><use href="#i-bell"/></svg>Remind me</button>
+  </div>
+  <div id="shareStatus" class="status center" role="status"></div>
+  <details class="fold" id="parsedCard" style="display:none"><summary><span class="sum-l"><svg class="ic"><use href="#i-bookopen"/></svg>How I read the signs</span></summary><div id="parsed"></div></details>
  </div>
- <p class="muted">⚠️ This is a helper, not a legal guarantee. Photo text reading can be wrong, so always compare it with the actual sign. When more than one sign is on a pole, the most restrictive one applies.</p>
-</div>
+</section>
+
+<section class="step">
+ <div class="sec-h"><h2>My saved spots</h2></div>
+ <div class="card" id="savedList"></div>
+</section>
+
+<section class="step">
+ <div class="sec-h"><h2>Good to know</h2></div>
+ <details class="fold"><summary><span class="sum-l"><svg class="ic"><use href="#i-info"/></svg>Citywide rules (no sign needed)</span></summary>
+  <ul>
+   <li>No parking within <b>15 ft of a fire hydrant</b> (even if unmarked).</li>
+   <li>Don't block <b>crosswalks</b>, <b>sidewalks</b>, or <b>driveways</b> (including your host's).</li>
+   <li>No standing at <b>bus stops</b>, or double parking.</li>
+   <li>Meters: pay with the <b>ParkNYC</b> app or the muni-meter; they are suspended on major legal holidays.</li>
+   <li>Street cleaning (broom) rules are suspended on ASP holidays; other signs usually still apply.</li>
+  </ul>
+  <div class="field-l" style="margin-top:4px">Official sources</div>
+  <div class="sources">
+   <a href="https://www.nyc.gov/html/dot/html/motorist/parking.shtml" target="_blank" rel="noopener">NYC DOT Parking</a>
+   <a href="https://www.nyc.gov/html/dot/html/motorist/signs.shtml" target="_blank" rel="noopener">DOT sign guide</a>
+   <a href="https://www.nyc.gov/site/finance/vehicles/services-violation-codes.page" target="_blank" rel="noopener">DOF violation codes</a>
+   <a href="https://www.nyc.gov/html/dot/html/motorist/alternate-side-parking.shtml" target="_blank" rel="noopener">ASP calendar</a>
+   <a href="https://portal.311.nyc.gov/article/?kanumber=KA-01011" target="_blank" rel="noopener">311 ASP</a>
+   <a href="https://www.nyc.gov/html/dot/html/motorist/parknyc.shtml" target="_blank" rel="noopener">ParkNYC</a>
+  </div>
+ </details>
+ <p class="foot">ParkHero is a helper, not a legal guarantee. Photo text reading can be wrong, so always compare it with the actual sign. When more than one sign is on a pole, the most restrictive one applies.</p>
+</section>
 </main>
+
+<div class="checkbar"><button type="button" id="checkBtn" class="btn btn-primary"><svg class="ic"><use href="#i-check"/></svg><span id="checkLabel">Check parking</span></button></div>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="rules.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -183,26 +455,47 @@ label.ck{display:flex;align-items:center;gap:8px;font-size:15px;margin:6px 0}lab
 <script src="signs.js"></script>
 <script>
 const $=id=>document.getElementById(id); let ASP={holidays:{}}, place=null, lastCheck=null, nearSigns=[], map, pinMarker, accCircle, signLayer;
-const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const icon=(id,cls)=>`<svg class="ic${cls?' '+cls:''}" aria-hidden="true"><use href="#${id}"/></svg>`;
+const TZ='America/New_York';
+// ---- segmented controls that mirror a <select> (the select stays the source of truth) ----
+function segmentize(sel){
+  const wrap=document.createElement('div'); wrap.className='seg'; wrap.setAttribute('role','radiogroup');
+  if(sel.getAttribute('aria-label')) wrap.setAttribute('aria-label', sel.getAttribute('aria-label'));
+  sel.style.display='none'; sel.after(wrap);
+  const render=()=>{
+    wrap.innerHTML=''; wrap.style.display=sel.options.length?'flex':'none';
+    [...sel.options].forEach(o=>{ const b=document.createElement('button'); b.type='button'; b.textContent=o.textContent; b.setAttribute('role','radio'); b.setAttribute('aria-checked', String(o.value===sel.value));
+      b.onclick=()=>{ if(sel.value===o.value) return; sel.value=o.value; sel.dispatchEvent(new Event('change',{bubbles:true})); render(); };
+      wrap.appendChild(b); });
+  };
+  new MutationObserver(render).observe(sel,{childList:true,subtree:true});
+  sel.addEventListener('change',render); sel._segRender=render; render();
+  return wrap;
+}
 // ---- ASP status ----
 fetch('asp.json').then(r=>r.json()).then(j=>{ASP=j;
   const p=NYCRules.nyParts(new Date()); const key=NYCRules.ymd(p); const h=j.holidays[key];
-  let msg='';
-  if(j.today&&j.today.status&&/SUSPEND/i.test(j.today.status+j.today.name)){ msg=`🟡 <b>ASP SUSPENDED today</b> per NYC 311: ${j.today.name} ${j.today.message||''}`; h||(ASP.holidays[key]={asp:true,meters:/meter/i.test(j.today.message)&&/not|suspend/i.test(j.today.message),name:j.today.name}); }
-  else if(h) msg=`🟡 <b>ASP SUSPENDED today</b> (${h.name})${h.meters?'. Meters are also suspended.':'. Meters stay in effect.'}`;
-  else if(p.dow===0) msg='Sunday: ASP and meters are not in effect (unless the sign says otherwise).';
-  else msg='✅ No scheduled ASP suspension today (official DOT calendar). Weather/emergency suspensions: <a target=_blank href="https://portal.311.nyc.gov/article/?kanumber=KA-01011">check 311</a>.';
+  let status='', details='', kind='ok';
+  if(j.today&&j.today.status&&/SUSPEND/i.test(j.today.status+j.today.name)){ kind='warn'; status='<b>ASP suspended today</b>'; details=`Per NYC 311: ${esc(j.today.name)} ${esc(j.today.message||'')}`; h||(ASP.holidays[key]={asp:true,meters:/meter/i.test(j.today.message)&&/not|suspend/i.test(j.today.message),name:j.today.name}); }
+  else if(h){ kind='warn'; status='<b>ASP suspended today</b> · '+esc(h.name); details=h.meters?'Meters are also suspended today.':'Meters stay in effect today.'; }
+  else if(p.dow===0){ kind='ok'; status='<b>Sunday</b> · ASP and meters are off'; details='Unless a sign says otherwise, Alternate Side Parking and meters are not in effect on Sundays.'; }
+  else { status='<b>ASP in effect today</b> · no scheduled suspension'; details='Source: the official NYC DOT suspension calendar. Weather or emergency suspensions can be announced the same day: <a target="_blank" rel="noopener" href="https://portal.311.nyc.gov/article/?kanumber=KA-01011">check 311</a>.'; }
   const up=Object.entries(j.holidays).filter(([k])=>k>key).sort()[0];
-  if(up) msg+=`<br><span class="muted">Next suspension: ${new Date(up[0]+'T12:00').toDateString()} (${up[1].name})</span>`;
-  $('aspBox').innerHTML=msg;
-}).catch(()=>$('aspBox').textContent='Could not load ASP status.');
+  if(up){ const d=new Date(up[0]+'T12:00'); status+=`<div class="asp-next">Next suspension: ${d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})} · ${esc(up[1].name)}</div>`; details+=`<br>Next suspension: ${d.toDateString()} (${esc(up[1].name)}).`; }
+  $('aspBox').className='asp '+kind; $('aspStatus').innerHTML=status; $('aspDetails').innerHTML=details;
+}).catch(()=>{ $('aspStatus').textContent='Could not load ASP status.'; $('aspMore').hidden=true; });
 // ---- location ----
-$('locBtn').onclick=()=>{ if(!navigator.geolocation) return $('loc').textContent='Location not supported';
+function setLocHtml(label, lat, lon, acc){
+  const coords=`${lat.toFixed(5)}, ${lon.toFixed(5)}${acc?` · ±${Math.round(acc)} m`:''}`;
+  $('loc').innerHTML=label?`<b>${esc(label)}</b><br><span>${coords} · <a target="_blank" rel="noopener" href="https://www.google.com/maps?q=${lat},${lon}">map</a></span>`:`<b>${coords}</b>`;
+}
+$('locBtn').onclick=()=>{ if(!navigator.geolocation) return $('loc').textContent='Location is not supported on this browser.';
   $('loc').textContent='Locating…';
   navigator.geolocation.getCurrentPosition(async pos=>{const {latitude:a,longitude:o,accuracy:acc}=pos.coords;
     place={lat:a,lon:o,acc:acc,label:null};
-    $('loc').innerHTML=`${a.toFixed(5)}, ${o.toFixed(5)} (±${Math.round(acc)} m)`;
-    try{const j=await (await fetch(`https://geosearch.planninglabs.nyc/v2/reverse?point.lat=${a}&point.lon=${o}&size=1`).then(r=>r.json()).then(j=>({json:()=>({label:j.features&&j.features[0]&&j.features[0].properties.label})}))).json(); if(j.label){ place.label=j.label; $('loc').innerHTML=`<b>${j.label}</b><br><span class="muted">${a.toFixed(5)}, ${o.toFixed(5)} ±${Math.round(acc)} m · <a target=_blank href="https://www.google.com/maps?q=${a},${o}">map</a></span>`; }}catch(e){}
+    setLocHtml(null,a,o,acc);
+    try{const j=await fetch(`https://geosearch.planninglabs.nyc/v2/reverse?point.lat=${a}&point.lon=${o}&size=1`).then(r=>r.json()); const label=j.features&&j.features[0]&&j.features[0].properties.label; if(label){ place.label=label; setLocHtml(label,a,o,acc); }}catch(e){}
   },e=>$('loc').textContent='Location error: '+e.message,{enableHighAccuracy:true,timeout:15000});
 };
 // ---- two sign slots ----
@@ -211,17 +504,28 @@ function fillSelect(el, values, selected){
   el.innerHTML='';
   for(const v of values){ const o=document.createElement('option'); o.value=String(v); o.textContent=String(v); if(String(v)===String(selected)) o.selected=true; el.appendChild(o); }
 }
+function refreshPlaque(slot){
+  const t=slot.txt.value.trim();
+  slot.plaque.hidden=!t; slot.plaque.textContent=t;
+  slot.plaque.classList.toggle('ignored', arrowOf(slot)==='away');
+  slot.textSum.textContent=t?'Edit the sign text':'Type the sign text';
+  slot.textBox.classList.toggle('show', !!t);
+}
+function refreshPlaques(){ slots.forEach(refreshPlaque); }
 function mountSign(id, title, optional){
   const frag=document.getElementById('signTpl').content.cloneNode(true);
   const root=frag.querySelector('.sign');
   root.dataset.side=id;
-  root.querySelector('.signTitle').innerHTML=title;
+  root.querySelector('.signTitle').textContent=title;
+  root.querySelector('.sign-badge').textContent=id==='behind'?'B':'F';
+  const chip=root.querySelector('.signChip'); chip.textContent=optional?'Optional':'Required'; if(!optional) chip.classList.add('req');
   root.querySelectorAll('input[type=radio]').forEach(r=>{ r.name='arrow-'+id; });
   document.getElementById('signList').appendChild(frag);
   const slot={id, optional:!!optional, root:document.querySelector('.sign[data-side="'+id+'"]'), builderTouched:false, sc:{}, frame:{img:null,zoom:1,panX:0,panY:0,cw:300,ch:280,dpr:1}};
   const s=slot.root;
   slot.txt=q(s,'.txt'); slot.status=q(s,'.ocrStatus'); slot.prog=q(s,'progress'); slot.canvas=q(s,'canvas'); slot.stage=q(s,'.stage');
   slot.zoom=q(s,'.zoom'); slot.cropBox=q(s,'.cropBox'); slot.builder=q(s,'.builder');
+  slot.plaque=q(s,'.plaque'); slot.textBox=q(s,'.textBox'); slot.textSum=q(s,'.textSum');
   slot.type=q(s,'.pType'); slot.hours=q(s,'.pHours'); slot.hoursRow=q(s,'.pHoursRow'); slot.any=q(s,'.pAny');
   slot.timeFields=q(s,'.timeFields'); slot.readout=q(s,'.timeReadout'); slot.warn=q(s,'.timeWarn'); slot.days=q(s,'.pDays');
   ['pFromH','pFromM','pFromAP','pToH','pToM','pToAP'].forEach(c=>{ slot[c]=q(s,'.'+c); });
@@ -230,6 +534,7 @@ function mountSign(id, title, optional){
   fillSelect(slot.pFromM,['00','15','30','45'],'00');
   fillSelect(slot.pToM,['00','15','30','45'],'00');
   slot.pFromAP.value='AM'; slot.pToAP.value='PM';
+  segmentize(slot.pFromAP); segmentize(slot.pToAP);
   if(optional) slot.txt.placeholder='Optional. Leave empty if there is no sign behind you.';
   slot.clock=(h,m,ap)=>{ let hh=+slot[h].value; const mi=slot[m].value; const mer=slot[ap].value; if(mer==='PM'&&hh!==12) hh+=12; if(mer==='AM'&&hh===12) hh=0; return String(hh).padStart(2,'0')+':'+mi; };
   slot.builderOpts=()=>({type:slot.type.value, hours:slot.hours.value, anytime:slot.any.checked, from:slot.clock('pFromH','pFromM','pFromAP'), to:slot.clock('pToH','pToM','pToAP'), days:slot.days.value});
@@ -247,10 +552,17 @@ function mountSign(id, title, optional){
   [slot.pFromH,slot.pFromM,slot.pFromAP,slot.pToH,slot.pToM,slot.pToAP,slot.hours,slot.any,slot.days].forEach(el=>el.addEventListener('change',mark));
   slot.hours.addEventListener('input',mark);
   slot.sync();
-  slot.txt.oninput=()=>{ slot.sc={}; };
+  slot.txt.oninput=()=>{ slot.sc={}; refreshPlaque(slot); };
+  s.querySelectorAll('input[type=radio]').forEach(r=>r.addEventListener('change',()=>refreshPlaque(slot)));
+  const typeBtn=q(s,'.typeBtn'), buildBtn=q(s,'.buildBtn');
+  if(id!=='front') q(s,'.tile.primary').classList.remove('primary');
+  typeBtn.onclick=()=>{ slot.textBox.open=!slot.textBox.open; if(slot.textBox.open){ slot.txt.focus({preventScroll:true}); slot.textBox.scrollIntoView({behavior:'smooth',block:'center'}); } };
+  buildBtn.onclick=()=>{ slot.builder.open=!slot.builder.open; if(slot.builder.open) slot.builder.scrollIntoView({behavior:'smooth',block:'start'}); };
+  slot.textBox.addEventListener('toggle',()=>{ typeBtn.classList.toggle('on',slot.textBox.open); typeBtn.setAttribute('aria-expanded',slot.textBox.open); });
+  slot.builder.addEventListener('toggle',()=>{ buildBtn.classList.toggle('on',slot.builder.open); buildBtn.setAttribute('aria-expanded',slot.builder.open); });
   q(s,'.addBtn').onclick=()=>{
     const built=NYCRules.buildSignLine(slot.builderOpts());
-    if(built.error){ showVerdict('no','<div class="big">Check the times</div><div class="line">'+slotName(slot)+': '+esc(built.error)+'</div>'); return; }
+    if(built.error){ showVerdict('warn',problemHtml('Check the times', slotName(slot)+': '+esc(built.error))); return; }
     slot.txt.value=(slot.txt.value.trim()?slot.txt.value.trim()+'\n\n':'')+built.line;
     slot.builderTouched=true;
     check();
@@ -262,7 +574,7 @@ function mountSign(id, title, optional){
       requestAnimationFrame(()=>{ sizeCanvas(slot); drawFrame(slot); });
       slot.status.textContent='Photo loaded. Drag the sign into the blue frame and zoom in, then tap Read sign. Nothing is read until you do.';
     };
-    img.onerror=()=>{ slot.status.textContent='Could not open that photo. Use build a sign quickly instead.'; };
+    img.onerror=()=>{ slot.status.textContent='Could not open that photo. Use Build it instead.'; };
     img.src=URL.createObjectURL(f);
   };
   slot.zoom.oninput=()=>{ slot.frame.zoom=+(slot.zoom.value||1); drawFrame(slot); };
@@ -284,17 +596,28 @@ function wherePhrase(rules){
 }
 const slots=[
   mountSign('front','Sign in front of my car',false),
-  mountSign('behind','Sign behind my car <small style="font-weight:400;text-transform:none;letter-spacing:0">optional</small>',true)
+  mountSign('behind','Sign behind my car',true)
 ];
 
 function arrowOf(slot){ const el=slot.root.querySelector('input[type=radio]:checked'); return el?el.value:'toward'; }
 function otherHasSign(slot){ return slots.some(s=>s!==slot && (s.txt.value.trim() || s.builderTouched)); }
-function showVerdict(kind, html){ const v=$('verdict'); v.style.display='block'; v.className=kind; v.innerHTML=html; v.scrollIntoView({behavior:'smooth'}); }
+// ---- verdict card ----
+const VHEAD={ok:['i-check','Can park now'], warn:['i-alert','Heads up'], no:['i-x','Cannot park now']};
+function headHtml(kind,label){ const [ic,def]=VHEAD[kind]||VHEAD.warn; return `<div class="v-head"><span class="v-icon">${icon(ic)}</span>${esc(label||def)}</div>`; }
+function problemHtml(title, line){ return `<div class="big">${title}</div><div class="line">${line}</div>`; }
+function showVerdict(kind, html, quiet){
+  stopCountdown();
+  $('resultEmpty').hidden=true; $('resultBody').hidden=false;
+  const v=$('verdict'); v.className='verdict '+kind; v.innerHTML=(/class="v-head"/.test(html)?'':headHtml(kind))+html;
+  void v.offsetWidth; v.classList.add('pop');
+  $('checkLabel').textContent='Check again';
+  if(!quiet) setTimeout(()=>v.scrollIntoView({behavior:'smooth',block:'start'}),30);
+}
 function nothingParsedHtml(slot){
-  return '<div class="big">?</div>'
+  return '<div class="big">No rule found</div>'
     +'<div class="line">'+slotName(slot)+': no parking rule found in that text.</div>'
     +'<div class="line">Try a line like <b>NO PARKING 8AM-11AM TUES</b> or <b>3 HOUR METERED PARKING COMMERCIAL VEHICLES ONLY 7AM-7PM EXCEPT SUNDAY</b>.</div>'
-    +'<div class="line">Or open “build a sign quickly” on that sign and tap <b>Can I park here now?</b>. You do not need to tap Add this sign first.</div>';
+    +'<div class="line">Or tap <b>Build it</b> on that sign and then <b>Check parking</b>. You do not need to tap Add this sign first.</div>';
 }
 function renderParsed(rules){
   $('parsedCard').style.display='block';
@@ -321,42 +644,87 @@ function resolveSlot(slot){
   if(parsed.rules.every(r=>r.badWindow)) return {error:'bad', rules:parsed.rules};
   return {rules:parsed.rules.filter(r=>!r.badWindow), shown:parsed.rules, fromBuilder};
 }
-function check(){
+const tOnly=d=>d.toLocaleTimeString('en-US',{timeZone:TZ,hour:'numeric',minute:'2-digit'});
+function dayLabel(d, now){
+  const k=x=>NYCRules.ymd(NYCRules.nyParts(x));
+  if(k(d)===k(now)) return 'Today';
+  if(k(d)===k(new Date(now.getTime()+864e5))) return 'Tomorrow';
+  return d.toLocaleDateString('en-US',{timeZone:TZ,weekday:'long',month:'short',day:'numeric'});
+}
+const pad2=n=>String(n).padStart(2,'0');
+function countdownText(ms){ const s=Math.max(0,Math.floor(ms/1000)), d=Math.floor(s/86400), h=Math.floor(s%86400/3600), m=Math.floor(s%3600/60), x=s%60;
+  if(d) return `${d}d ${h}h ${pad2(m)}m`; if(h) return `${h}h ${pad2(m)}m ${pad2(x)}s`; return `${m}m ${pad2(x)}s`; }
+let cdTimer=null;
+function stopCountdown(){ clearInterval(cdTimer); cdTimer=null; }
+function startCountdown(target){
+  stopCountdown(); if(!target) return;
+  const t=+target; let fired=false;
+  const tick=()=>{ const el=document.querySelector('#verdict .v-count b'); if(!el){ stopCountdown(); return; }
+    const ms=t-Date.now();
+    if(ms<=0){ el.textContent='now'; stopCountdown(); if(!fired){ fired=true; setTimeout(()=>check({quiet:true}),1200); } return; }
+    el.textContent=countdownText(ms); };
+  tick(); cdTimer=setInterval(tick,1000);
+}
+function check(opts){
+  const quiet=!!(opts&&opts.quiet);
+  refreshPlaques();
   const sides=[]; const shown=[]; const notes=[]; const problems=[]; const usedBuilder=[];
   for(const slot of slots){
     const got=resolveSlot(slot);
     if(got.skip) continue;
     if(got.ignored){ sides.push({id:slot.id, arrow:'away', rules:[]}); continue; }
     if(got.error==='noparse'){ problems.push(nothingParsedHtml(slot)); continue; }
-    if(got.error==='bad'){ problems.push('<div class="big">Check the times</div><div class="line">'+slotName(slot)+': '+esc((got.rules||[]).map(r=>r.notes.join(' ')).join(' '))+'</div>'); shown.push(...(got.rules||[])); continue; }
-    if(got.error){ problems.push('<div class="big">Check the times</div><div class="line">'+slotName(slot)+': '+esc(got.error)+'</div>'); continue; }
+    if(got.error==='bad'){ problems.push(problemHtml('Check the times', slotName(slot)+': '+esc((got.rules||[]).map(r=>r.notes.join(' ')).join(' ')))); shown.push(...(got.rules||[])); continue; }
+    if(got.error){ problems.push(problemHtml('Check the times', slotName(slot)+': '+esc(got.error))); continue; }
     sides.push({id:slot.id, arrow:arrowOf(slot), rules:got.rules});
     shown.push(...(got.shown||got.rules));
     if(got.fromBuilder) usedBuilder.push(slot);
   }
-  if(problems.length){ lastCheck=null; showVerdict('no', problems.join('')); if(shown.length) renderParsed(shown); else $('parsedCard').style.display='none'; return; }
-  if(!sides.length){ lastCheck=null; showVerdict('no','<div class="big">?</div><div class="line">Add a sign in front of the car, or set its arrow to point toward the car.</div>'); $('parsedCard').style.display='none'; return; }
+  refreshPlaques();
+  if(problems.length){ lastCheck=null; showVerdict('warn', problems.join(''), quiet); if(shown.length) renderParsed(shown); else $('parsedCard').style.display='none'; return; }
+  if(!sides.length){ lastCheck=null; showVerdict('warn', problemHtml('Add a sign first','Snap, type, or build the sign in front of your car, or set its arrow to point toward the car.'), quiet); $('parsedCard').style.display='none'; return; }
   const now=new Date();
   const r=NYCRules.evaluateSides(sides, now, ASP.holidays, {commercial:$('commercial').checked});
-  const F=NYCRules.fmt, D=NYCRules.dur;
-  let h='';
-  const v=$('verdict'); v.style.display='block';
-  if(r.canPark){ v.className='ok'; h+='<div class="big">✅ CAN PARK NOW</div>';
-    if(r.limit) h+=`<div class="line">⏱ ${r.limit.minutes/60} hour max${r.limit.metered?' · pay the meter / ParkNYC':''}${wherePhrase([{side:r.limit.side}])}.</div>`;
-    if(r.nextViolation) h+=`<div class="line">${r.violationIsTimeLimit?'Time limit runs out':'Violation starts'}: <b>${F(r.nextViolation)}</b>${wherePhrase(r.nextRules)}<br>(in ${D(r.nextViolation-now)}) · move before then.</div>`;
-    else h+='<div class="line">No restriction found in the next 2 weeks.</div>';
-    if(r.upcomingLimit) h+=`<div class="line">Heads up: ${r.upcomingLimit.minutes/60} hr limit${r.upcomingLimit.metered?' (metered)':''} starts ${F(r.upcomingLimit.start)}${wherePhrase([{side:r.upcomingLimit.side}])}.</div>`;
-  } else { v.className='no'; h+='<div class="big">⛔ CANNOT PARK NOW</div>';
-    h+=`<div class="line">Restricted by${wherePhrase(r.blockedBy)}: ${r.blockedBy.map(x=>esc(NYCRules.describe(x))).join('; ')}</div>`;
-    h+= r.okAt?`<div class="line">OK to park from: <b>${F(r.okAt)}</b><br>(in ${D(r.okAt-now)})${r.blockedBy.length>1?' — when every sign that applies allows it':''}</div>`:'<div class="line">Never: this restriction is in effect at all times.</div>';
-    if(r.limitAtOk) h+=`<div class="line">Then a ${r.limitAtOk.minutes/60} hr limit${r.limitAtOk.metered?' (metered)':''} applies until ${F(r.limitAtOk.windowEnd)}${wherePhrase([{side:r.limitAtOk.side}])}.</div>`;
+  const F=NYCRules.fmt;
+  const lines=[]; let kind, label, key, when='';
+  const hnum=m=>{ const h=m/60; return Number.isInteger(h)?h:h.toFixed(1); };
+  const hrs=m=>hnum(m)+(m===60?' hour':' hours');
+  const hrAdj=m=>hnum(m)+'-hour';
+  if(r.canPark){
+    const soon=r.nextViolation && (r.nextViolation-now)<3600e3;
+    kind=soon?'warn':'ok'; label=soon?'Can park · move soon':'Can park now';
+    if(r.nextViolation){
+      key=`<div class="v-key"><small>${r.violationIsTimeLimit?'Time is up at':'Move by'}</small>${esc(tOnly(r.nextViolation))}</div>`;
+      when=`<div class="v-when"><span>${esc(dayLabel(r.nextViolation,now))}</span><span class="v-count">${icon('i-clock')}<b></b> left</span></div>`;
+    } else {
+      key='<div class="v-key text"><small>No restriction found</small>All clear</div>';
+      when=r.upcomingLimit?`<div class="v-when"><span>No ban ahead. A time limit starts ${esc(dayLabel(r.upcomingLimit.start,now).replace(/^(Today|Tomorrow)$/,x=>x.toLowerCase()))} at ${esc(tOnly(r.upcomingLimit.start))}.</span></div>`:'<div class="v-when"><span>Nothing kicks in for the next 2 weeks.</span></div>';
+    }
+    if(r.limit) lines.push(`${hrs(r.limit.minutes)} max${r.limit.metered?' · pay the meter or use ParkNYC':''}${wherePhrase([{side:r.limit.side}])}.`);
+    if(r.nextViolation) lines.push(`${r.violationIsTimeLimit?'Time limit runs out':'Violation starts'}: <b>${esc(F(r.nextViolation))}</b>${wherePhrase(r.nextRules)}. Move before then.`);
+    if(r.upcomingLimit) lines.push(`Heads up: a ${hrAdj(r.upcomingLimit.minutes)} limit${r.upcomingLimit.metered?' (metered)':''} starts ${esc(F(r.upcomingLimit.start))}${wherePhrase([{side:r.upcomingLimit.side}])}.`);
+  } else {
+    kind='no'; label='Cannot park now';
+    if(r.okAt){
+      key=`<div class="v-key"><small>OK at</small>${esc(tOnly(r.okAt))}</div>`;
+      when=`<div class="v-when"><span>${esc(dayLabel(r.okAt,now))}</span><span class="v-count">${icon('i-clock')}opens in <b></b></span></div>`;
+    } else {
+      key='<div class="v-key text"><small>Not allowed</small>Any time</div>';
+      when='<div class="v-when"><span>This restriction is in effect at all times.</span></div>';
+    }
+    lines.push(`Restricted by${wherePhrase(r.blockedBy)}: ${r.blockedBy.map(x=>esc(NYCRules.describe(x))).join('; ')}`);
+    if(r.okAt) lines.push(`OK from <b>${esc(F(r.okAt))}</b>${r.blockedBy.length>1?', when every sign that applies allows it':''}.`);
+    if(r.limitAtOk) lines.push(`Then a ${hrAdj(r.limitAtOk.minutes)} limit${r.limitAtOk.metered?' (metered)':''} applies until ${esc(F(r.limitAtOk.windowEnd))}${wherePhrase([{side:r.limitAtOk.side}])}.`);
   }
-  for(const ign of r.ignored||[]) h+=`<div class="line">The sign ${ign.id==='behind'?'behind the car':'in front of the car'} points away, so it was not used.</div>`;
-  for(const slot of usedBuilder) h+=`<div class="line" style="font-size:14px;opacity:.9">Used ${slotName(slot).toLowerCase()} from “build a sign quickly” because that text box was empty.</div>`;
-  h+=`<div class="line" style="font-size:14px;opacity:.9">Checked at ${F(now)} NYC time. Also watch out for hydrants, driveways, and bus stops.</div>`;
-  v.innerHTML=h;
+  for(const ign of r.ignored||[]) lines.push(`The sign ${ign.id==='behind'?'behind the car':'in front of the car'} points away, so it was not used.`);
+  const small=[];
+  for(const slot of usedBuilder) small.push(`Used ${slotName(slot).toLowerCase()} from “Build a sign quickly” because its text was empty.`);
+  small.push(`Checked ${esc(F(now))} NYC time. Also watch for hydrants, driveways, and bus stops.`);
+  const html=headHtml(kind,label)+key+when+'<ul class="v-lines">'+lines.map(l=>`<li>${l}</li>`).join('')+small.map(l=>`<li class="small">${l}</li>`).join('')+'</ul>';
+  showVerdict(kind, html, quiet);
   if(shown.length) renderParsed(shown); else $('parsedCard').style.display='none';
   const whenDate=r.canPark?r.nextViolation:r.okAt;
+  startCountdown(whenDate);
   lastCheck={
     canPark:!!r.canPark,
     verdictLine:r.canPark?'CAN PARK NOW':'CANNOT PARK NOW',
@@ -365,7 +733,7 @@ function check(){
     whenKind:r.canPark?(r.nextViolation?'move':''):(r.okAt?'open':'')
   };
 }
-$('checkBtn').onclick=check;
+$('checkBtn').onclick=()=>check();
 // ---- photo crop + OCR (one framer per sign) ----
 let ocrWorker=null, ocrPass=0, ocrTotal=1, ocrSlot=null, ocrBusy=false;
 function sizeCanvas(slot){
@@ -390,7 +758,7 @@ function drawFrame(slot){
   const fr=frameRect(slot);
   ctx.fillStyle='rgba(0,0,0,.45)';
   ctx.beginPath(); ctx.rect(0,0,slot.frame.cw,slot.frame.ch); ctx.rect(fr.x,fr.y,fr.w,fr.h); ctx.fill('evenodd');
-  ctx.strokeStyle='#60a5fa'; ctx.lineWidth=3; ctx.strokeRect(fr.x,fr.y,fr.w,fr.h);
+  ctx.strokeStyle='#5B86FF'; ctx.lineWidth=3; ctx.strokeRect(fr.x,fr.y,fr.w,fr.h);
 }
 function regionCanvas(slot, full){
   const img=slot.frame.img; let sx=0,sy=0,sw=img.width,sh=img.height;
@@ -457,7 +825,7 @@ async function recognize(canvas){
 }
 async function runOcr(slot, full){
   if(ocrBusy || !slot.frame.img) return;
-  if(typeof Tesseract==='undefined'){ slot.status.innerHTML='Text reading did not load. Open <b>build a sign quickly</b> and enter the sign there.'; return; }
+  if(typeof Tesseract==='undefined'){ slot.status.innerHTML='Text reading did not load. Tap <b>Build it</b> and enter the sign there.'; return; }
   ocrBusy=true; ocrSlot=slot;
   slot.prog.style.display='block'; slot.prog.value=0;
   slot.status.textContent=full?'Reading the whole photo…':'Reading the sign in the frame…';
@@ -486,14 +854,14 @@ async function runOcr(slot, full){
     const cleaned=NYCRules.cleanOcr(best.text);
     if(!NYCRules.ocrLooksUseful(cleaned)){
       const saw=cleaned?` I saw “${esc(cleaned.slice(0,140))}”, which is not a parking rule.`:'';
-      slot.status.innerHTML=`Could not read a parking rule from this photo.${saw} Zoom in until the sign fills the blue frame and try again, or open <b>build a sign quickly</b> and tap <b>Can I park here now?</b>.`;
+      slot.status.innerHTML=`Could not read a parking rule from this photo.${saw} Zoom in until the sign fills the blue frame and try again, or tap <b>Build it</b> and then <b>Check parking</b>.`;
     } else {
-      slot.txt.value=cleaned; slot.sc={};
-      slot.status.innerHTML='Done. <b>Check this text against the sign</b> and fix anything wrong, then tap Can I park here now?';
+      slot.txt.value=cleaned; slot.sc={}; refreshPlaque(slot);
+      slot.status.innerHTML='Done. <b>Check this text against the sign</b> (tap <b>Edit the sign text</b> to fix anything), then tap <b>Check parking</b>.';
       if(NYCRules.parse(cleaned).rules.length) check();
     }
   }catch(err){
-    slot.status.innerHTML='Could not read that photo ('+esc(err.message)+'). Open <b>build a sign quickly</b> and enter the sign there instead.';
+    slot.status.innerHTML='Could not read that photo ('+esc(err.message)+'). Tap <b>Build it</b> and enter the sign there instead.';
   }
   slot.prog.style.display='none';
   ocrBusy=false; ocrSlot=null;
@@ -519,7 +887,8 @@ function spReady(){ if(typeof proj4==='undefined') return false; try{ proj4.defs
 function llToSp(lon,lat){ return proj4('EPSG:4326','EPSG:2263',[lon,lat]); }
 function spToLl(x,y){ const p=proj4('EPSG:2263','EPSG:4326',[+x,+y]); return {lon:p[0], lat:p[1]}; }
 function blockKey(s){ return [s.borough,s.on_street,s.from_street,s.to_street,s.side_of_street].join('|'); }
-function blockLabel(s){ return `${(s.on_street||'').replace(/\s+/g,' ')} from ${(s.from_street||'').replace(/\s+/g,' ')} to ${(s.to_street||'').replace(/\s+/g,' ')} · side ${s.side_of_street}`; }
+const tidy=s=>(s||'').replace(/\s+/g,' ').trim();
+function blockLabel(s){ return `${tidy(s.on_street)} from ${tidy(s.from_street)} to ${tidy(s.to_street)} · side ${s.side_of_street}`; }
 function currentState(){
   return {v:1, front:slots[0].txt.value.trim(), frontArrow:arrowOf(slots[0]), behind:slots[1].txt.value.trim(), behindArrow:arrowOf(slots[1]), commercial:$('commercial').checked, lat:place&&place.lat, lon:place&&place.lon, acc:place&&place.acc, label:place&&place.label};
 }
@@ -530,7 +899,8 @@ function applyState(state){
   const fa=slots[0].root.querySelector('input[value="'+(state.frontArrow||'toward')+'"]'); if(fa) fa.checked=true;
   const ba=slots[1].root.querySelector('input[value="'+(state.behindArrow||'toward')+'"]'); if(ba) ba.checked=true;
   $('commercial').checked=!!state.commercial;
-  if(state.lat!=null && state.lon!=null){ place={lat:+state.lat, lon:+state.lon, acc:state.acc||null, label:state.label||null}; $('loc').innerHTML=place.label?`<b>${esc(place.label)}</b><br><span class="muted">${place.lat.toFixed(5)}, ${place.lon.toFixed(5)}</span>`:`${place.lat.toFixed(5)}, ${place.lon.toFixed(5)}`; }
+  if(state.lat!=null && state.lon!=null){ place={lat:+state.lat, lon:+state.lon, acc:state.acc||null, label:state.label||null}; setLocHtml(place.label, place.lat, place.lon, null); }
+  refreshPlaques();
 }
 function shareUrl(){ const u=new URL(location.href); u.hash='p='+NYCSigns.encodeState(currentState()); return u.toString(); }
 async function onShare(){
@@ -546,8 +916,9 @@ function readSpots(){ try{ return JSON.parse(localStorage.getItem(SPOTS)||'[]');
 function writeSpots(list){ localStorage.setItem(SPOTS, JSON.stringify(list.slice(0,30))); }
 function renderSpots(){
   const list=readSpots(); const box=$('savedList');
-  if(!list.length){ box.textContent='None yet.'; return; }
-  box.innerHTML=list.map(s=>`<div class="spot"><b>${esc(s.verdict||'')}</b> · ${esc(s.address||'No address')}<br><span class="muted">${esc(new Date(s.savedAt).toLocaleString('en-US',{timeZone:'America/New_York'}))} NYC</span><br><button type="button" data-re="${esc(s.id)}">Re-check</button> <button type="button" class="sec" data-del="${esc(s.id)}">Delete</button></div>`).join('');
+  if(!list.length){ box.innerHTML=`<div class="empty-s">${icon('i-bookmark')}<span>None yet. Tap <b>Save spot</b> after a check to keep it here.</span></div>`; return; }
+  box.innerHTML=list.map(s=>{ const v=String(s.verdict||''); const cls=/^CANNOT/.test(v)?'no':/^CAN/.test(v)?'ok':'';
+    return `<div class="spot"><span class="dot ${cls}" aria-hidden="true"></span><div class="spot-b"><div class="spot-v">${esc(v)}</div><div class="spot-a">${esc(s.address||'No address')}</div><div class="spot-t">${esc(new Date(s.savedAt).toLocaleString('en-US',{timeZone:TZ,month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}))} NYC</div></div><div class="spot-btns"><button type="button" class="btn-s" data-re="${esc(s.id)}">Re-check</button><button type="button" class="icon-btn" data-del="${esc(s.id)}" aria-label="Delete saved spot">${icon('i-trash')}</button></div></div>`; }).join('');
   box.querySelectorAll('[data-re]').forEach(b=>b.onclick=()=>{ const s=readSpots().find(x=>x.id===b.dataset.re); if(!s) return; applyState(s.state); check(); });
   box.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ writeSpots(readSpots().filter(x=>x.id!==b.dataset.del)); renderSpots(); });
 }
@@ -569,13 +940,14 @@ function onIcs(){
 function ensureMap(lat,lon,acc){
   $('mapWrap').style.display='block';
   if(typeof L==='undefined'){ $('findStatus').textContent='The map library did not load. The sign list below still works.'; return; }
+  const brand=getComputedStyle(document.documentElement).getPropertyValue('--brand').trim()||'#2456F5';
   if(!map){
-    map=L.map('map',{zoomControl:true}).setView([lat,lon],18);
+    map=L.map('map',{zoomControl:true, attributionControl:true}).setView([lat,lon],18);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19, attribution:'© OpenStreetMap'}).addTo(map);
-    pinMarker=L.marker([lat,lon],{draggable:true}).addTo(map);
-    pinMarker.on('dragend',()=>{ const ll=pinMarker.getLatLng(); place=Object.assign({}, place||{}, {lat:ll.lat, lon:ll.lng}); lookupSigns(ll.lat, ll.lng, place&&place.acc); });
-    accCircle=L.circle([lat,lon],{radius:acc||25, color:'#1d4ed8', weight:1, fillOpacity:0.15}).addTo(map);
+    accCircle=L.circle([lat,lon],{radius:acc||25, color:brand, weight:1, fillColor:brand, fillOpacity:0.12}).addTo(map);
     signLayer=L.layerGroup().addTo(map);
+    pinMarker=L.marker([lat,lon],{draggable:true, title:'Your car (drag to adjust)', icon:L.divIcon({className:'ph-pin', html:'<span></span>', iconSize:[26,26], iconAnchor:[13,13]})}).addTo(map);
+    pinMarker.on('dragend',()=>{ const ll=pinMarker.getLatLng(); place=Object.assign({}, place||{}, {lat:ll.lat, lon:ll.lng}); accCircle.setLatLng(ll); lookupSigns(ll.lat, ll.lng, place&&place.acc); });
   } else { map.setView([lat,lon], Math.max(map.getZoom(),17)); pinMarker.setLatLng([lat,lon]); accCircle.setLatLng([lat,lon]); accCircle.setRadius(acc||25); }
   setTimeout(()=>map.invalidateSize(), 60);
 }
@@ -604,7 +976,7 @@ async function lookupSigns(lat, lon, acc){
   sel.onchange=()=>showSide(x,y);
   const face=$('facePick');
   const g0=ranked[0];
-  face.innerHTML=g0?`<option value="to">toward ${(g0.to||'').replace(/\s+/g,' ')}</option><option value="from">toward ${(g0.from||'').replace(/\s+/g,' ')}</option>`:'';
+  face.innerHTML=g0?`<option value="to">Toward ${esc(tidy(g0.to))}</option><option value="from">Toward ${esc(tidy(g0.from))}</option>`:'';
   if(signLayer) signLayer.clearLayers();
   const seen=new Set();
   for(const s of nearSigns){
@@ -613,11 +985,11 @@ async function lookupSigns(lat, lon, acc){
     if(seen.has(id) || typeof L==='undefined') continue;
     seen.add(id);
     const here=nearSigns.filter(o=>Math.round(+o.sign_x_coord)+','+Math.round(+o.sign_y_coord)===id);
-    const html=here.map(o=>`<div><b>${esc((o.sign_description||'').slice(0,140))}</b><br><span class="muted">${esc((o.distance_from_intersection||'?')+' ft · side '+ (o.side_of_street||''))}${o.arrow_direction?' · arrow '+esc(o.arrow_direction):''}</span></div>`).join('');
-    L.circleMarker([ll.lat,ll.lon],{radius:7, color:'#c62828', weight:2, fillOpacity:0.85}).bindPopup(html).addTo(signLayer);
+    const html=here.map(o=>`<div style="margin:4px 0"><b>${esc((o.sign_description||'').slice(0,140))}</b><br><span style="color:#667">${esc((o.distance_from_intersection||'?')+' ft · side '+ (o.side_of_street||''))}${o.arrow_direction?' · arrow '+esc(o.arrow_direction):''}</span></div>`).join('');
+    L.circleMarker([ll.lat,ll.lon],{radius:7, color:'#fff', weight:2.5, fillColor:'#E0353A', fillOpacity:1}).bindPopup(html).addTo(signLayer);
   }
   const u=new Set(nearSigns.map(s=>Math.round(+s.sign_x_coord)+','+Math.round(+s.sign_y_coord)));
-  let note=`${nearSigns.length} current signs within about ${Math.round(pad)} ft. GPS ±${Math.round(acc||0)} m.`;
+  let note=`${nearSigns.length} current signs within about ${Math.round(pad)} ft. GPS ±${Math.round(acc||0)} m. Drag the blue pin if it's off.`;
   if(nearSigns.length>8 && u.size<3) note+=' This block stores one coordinate for many signs, so the markers are the block, not each pole. Use the distances in the list.';
   $('findStatus').textContent=note;
   showSide(x,y);
@@ -633,9 +1005,12 @@ function showSide(px,py){
   const box=$('findItems');
   if(!signs.length){ box.innerHTML=''; return; }
   const g=signs[0];
-  $('facePick').innerHTML=`<option value="to">toward ${(g.to_street||'').replace(/\s+/g,' ')}</option><option value="from">toward ${(g.from_street||'').replace(/\s+/g,' ')}</option>`;
+  const keep=$('facePick').value;
+  $('facePick').innerHTML=`<option value="to">Toward ${esc(tidy(g.to_street))}</option><option value="from">Toward ${esc(tidy(g.from_street))}</option>`;
+  if(keep) $('facePick').value=keep; if($('facePick')._segRender) $('facePick')._segRender();
   const poles=NYCSigns.groupPoles(signs.map(s=>({description:s.sign_description, dist:+s.distance_from_intersection, x:+s.sign_x_coord, y:+s.sign_y_coord, compass:s.arrow_direction, raw:s})));
-  box.innerHTML=poles.map((p,i)=>`<div class="find-item"><b>${p.dist} ft</b> from the from-street<br>${p.signs.filter(s=>!NYCSigns.isLocator(s.description)).map(s=>esc(s.description)).join('<br>')||'<span class="muted">locator / info only</span>'}<br><button type="button" data-pole="${i}" data-slot="front">In front</button><button type="button" class="sec" data-pole="${i}" data-slot="behind">Behind</button></div>`).join('');
+  box.innerHTML=`<div class="list-h">Sign poles on this side · ${poles.length}</div>`+poles.map((p,i)=>`<div class="pole"><div class="pole-d"><b>${esc(p.dist)}</b><span>ft</span></div><div class="pole-b"><div class="pole-t">${p.signs.filter(s=>!NYCSigns.isLocator(s.description)).map(s=>`<div>${esc(s.description)}</div>`).join('')||'<span class="muted">Locator / info only</span>'}</div><div class="pole-a"><button type="button" class="btn-s" data-pole="${i}" data-slot="front">Use as front</button><button type="button" class="btn-s ghost" data-pole="${i}" data-slot="behind">Use as behind</button></div></div></div>`).join('')
+    +`<div class="muted" style="margin-top:6px">Distances are measured from ${esc(tidy(g.from_street))}.</div>`;
   box.querySelectorAll('button[data-pole]').forEach(b=>b.onclick=()=>{
     const pole=poles[+b.dataset.pole];
     const slot=slots.find(s=>s.id===b.dataset.slot);
@@ -653,7 +1028,7 @@ function fillNearest(){
   if(!signs.length){ $('findStatus').textContent='No signs on that side yet.'; return; }
   const pin=boxPin();
   const pinDist=NYCSigns.estimatePinDistance(signs.map(s=>({description:s.sign_description, dist:+s.distance_from_intersection, x:+s.sign_x_coord, y:+s.sign_y_coord})), pin);
-  if(pinDist==null){ $('findStatus').textContent='These signs share one map point, so pick In front / Behind from the list using the distances.'; return; }
+  if(pinDist==null){ $('findStatus').textContent='These signs share one map point, so pick Use as front / Use as behind from the list using the distances.'; return; }
   const picked=NYCSigns.pickFrontBehind(signs.map(s=>({description:s.sign_description, dist:+s.distance_from_intersection, x:+s.sign_x_coord, y:+s.sign_y_coord, compass:s.arrow_direction})), pinDist, $('facePick').value!=='from');
   let n=0;
   for(const [id,pole] of [['front',picked.front],['behind',picked.behind]]){
@@ -680,12 +1055,13 @@ $('findBtn').onclick=()=>{
   navigator.geolocation.getCurrentPosition(pos=>{
     const {latitude:lat, longitude:lon, accuracy:acc}=pos.coords;
     place={lat, lon, acc, label:place&&place.label};
-    $('loc').textContent=`${lat.toFixed(5)}, ${lon.toFixed(5)} (±${Math.round(acc)} m)`;
+    setLocHtml(null, lat, lon, acc);
     ensureMap(lat, lon, acc);
     lookupSigns(lat, lon, acc);
-    fetch(`https://geosearch.planninglabs.nyc/v2/reverse?point.lat=${lat}&point.lon=${lon}&size=1`).then(r=>r.json()).then(j=>{ const label=j.features&&j.features[0]&&j.features[0].properties.label; if(label){ place.label=label; $('loc').innerHTML=`<b>${esc(label)}</b><br><span class="muted">${lat.toFixed(5)}, ${lon.toFixed(5)} ±${Math.round(acc)} m</span>`; } }).catch(()=>{});
+    fetch(`https://geosearch.planninglabs.nyc/v2/reverse?point.lat=${lat}&point.lon=${lon}&size=1`).then(r=>r.json()).then(j=>{ const label=j.features&&j.features[0]&&j.features[0].properties.label; if(label){ place.label=label; setLocHtml(label, lat, lon, acc); } }).catch(()=>{});
   }, err=>{ $('findStatus').textContent='Location error: '+err.message; }, {enableHighAccuracy:true, timeout:15000});
 };
+segmentize($('facePick'));
 $('fillBtn').onclick=fillNearest;
 $('shareBtn').onclick=onShare;
 $('saveBtn').onclick=onSave;
