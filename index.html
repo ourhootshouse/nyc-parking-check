@@ -16,7 +16,7 @@ var d=p==='dark'||(p==='auto'&&window.matchMedia&&matchMedia('(prefers-color-sch
 var r=document.documentElement;r.setAttribute('data-theme',d?'dark':'light');r.setAttribute('data-theme-pref',p);
 var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',d?'#000000':'#f2f3f7');})();
 </script>
-<link rel="manifest" href="manifest.webmanifest?v=3157557.1">
+<link rel="manifest" href="manifest.webmanifest?v=2f5c43c.1">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -291,6 +291,42 @@ input.switch:checked::after{transform:translateX(20px)}
 
 @keyframes pop{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
 @keyframes fade{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+/* "I parked here" + Your car card */
+.parked-btn{margin:0 0 10px}
+.car-card{--tone:var(--ok);background:var(--card);border-radius:var(--r-xl);padding:14px 14px 12px;margin:14px 0 4px;box-shadow:var(--shadow);border:2px solid color-mix(in srgb,var(--tone) 55%,transparent);scroll-margin-top:76px}
+.car-card.amber{--tone:var(--warn)}.car-card.red{--tone:var(--no)}
+.car-top{display:flex;align-items:center;gap:10px}
+.car-ic{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:none;background:color-mix(in srgb,var(--tone) 16%,transparent);color:var(--tone)}
+.car-card.amber .car-ic{color:#B87400}:root[data-theme="dark"] .car-card.amber .car-ic{color:var(--warn)}
+.car-h{flex:1;min-width:0}
+.car-h small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-2)}
+.car-addr{font-size:14.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.car-pill{flex:none;font-size:13px;font-weight:750;padding:5px 10px;border-radius:999px;background:var(--tone);color:#fff;font-variant-numeric:tabular-nums;white-space:nowrap}
+.car-card.amber .car-pill{color:#2B1800}
+.car-pill:empty{display:none}
+.car-title{font-size:25px;font-weight:800;letter-spacing:-.02em;line-height:1.15;margin:12px 2px 2px;font-variant-numeric:tabular-nums}
+.car-detail{font-size:14.5px;color:var(--text-2);margin:0 2px}
+.car-garage{display:flex;align-items:center;gap:8px;margin:10px 0 0;padding:9px 12px;border-radius:12px;background:var(--brand-soft);color:var(--brand-text);font-size:14px;font-weight:650;text-decoration:none;min-height:44px}
+.car-garage .ic{width:18px;height:18px}
+.car-garage span{flex:1;min-width:0}
+.car-garage a{color:inherit;font-weight:750;white-space:nowrap}
+.car-acts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px}
+.car-act{appearance:none;font:inherit;border:0;background:var(--fill);color:var(--brand-text);border-radius:14px;min-height:58px;padding:6px 2px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:12.5px;font-weight:650;cursor:pointer;white-space:nowrap;transition:transform .12s ease}
+.car-act:active{transform:scale(.96)}
+.car-act[aria-expanded="true"]{background:var(--brand-soft)}
+.car-act.clear{color:var(--text-2)}
+.car-act .ic{width:21px;height:21px}
+.car-card .status{margin:8px 2px 0}
+.car-find{margin-top:10px}
+.car-find .map-frame{margin:0 0 8px}
+#carMap{height:230px;width:100%}
+.car-walk{font-size:15px;font-weight:650;margin:2px 2px 0}
+.car-walk small{display:block;font-size:13px;font-weight:400;color:var(--text-2)}
+.car-find .btn{min-height:46px;font-size:16px}
+.car-pin span{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--no);color:#fff;border:3px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.35)}
+.car-pin svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.me-pin span{display:block;width:18px;height:18px;border-radius:50%;background:#1A73E8;border:3px solid #fff;box-shadow:0 0 0 6px rgba(26,115,232,.22),0 1px 6px rgba(0,0,0,.3)}
+@media (max-width:360px){.car-title{font-size:22px}.car-act{font-size:12px}.car-g-more{display:none}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media (max-width:360px){.v-key{font-size:44px}.intro h1{font-size:28px}}
 </style></head><body>
@@ -329,6 +365,28 @@ input.switch:checked::after{transform:translateX(20px)}
 </div></header>
 
 <main>
+<section id="carCard" class="car-card" hidden aria-labelledby="carLbl">
+ <div class="car-top">
+  <span class="car-ic" aria-hidden="true"><svg class="ic"><use href="#i-car"/></svg></span>
+  <div class="car-h"><small id="carLbl">Your car</small><div class="car-addr" id="carAddr"></div></div>
+  <span class="car-pill" id="carPill"></span>
+ </div>
+ <div role="status" aria-live="polite"><div class="car-title" id="carTitle"></div><div class="car-detail" id="carDetail"></div></div>
+ <div class="car-garage" id="carGarage" hidden><svg class="ic" aria-hidden="true"><use href="#i-garage"/></svg><span><span class="car-g-more">Need more time? </span>Garages nearby</span><a id="carSH" href="#" target="_blank" rel="noopener sponsored">SpotHero</a><a id="carPW" href="#" target="_blank" rel="noopener sponsored">ParkWhiz</a></div>
+ <div class="car-acts">
+  <button type="button" class="car-act" id="carRemind"><svg class="ic"><use href="#i-bell"/></svg>Remind me</button>
+  <button type="button" class="car-act" id="carFindBtn" aria-expanded="false" aria-controls="carFind"><svg class="ic"><use href="#i-pin"/></svg>Find car</button>
+  <button type="button" class="car-act" id="carShare"><svg class="ic"><use href="#i-share"/></svg>Share</button>
+  <button type="button" class="car-act clear" id="carClear"><svg class="ic"><use href="#i-check"/></svg>I moved</button>
+ </div>
+ <div class="car-find" id="carFind" hidden>
+  <div class="map-frame" id="carMapWrap"><div id="carMap" role="img" aria-label="Map of where your car is parked"></div></div>
+  <div class="car-walk" id="carWalk"></div>
+  <a class="btn btn-primary" id="carWalkBtn" href="#" target="_blank" rel="noopener"><svg class="ic"><use href="#i-map"/></svg>Walk there</a>
+ </div>
+ <div class="status" id="carStatus" role="status"></div>
+</section>
+
 <section class="intro">
  <h1>Can I park here?</h1>
  <p>Find or snap the signs on your block. ParkHero tells you straight, and when that changes.</p>
@@ -480,6 +538,7 @@ input.switch:checked::after{transform:translateX(20px)}
    <div class="g-note">Partner links · open in a new tab · prices and booking by each site</div>
    </div>
   </div>
+  <button type="button" class="btn btn-primary parked-btn" id="parkedBtn"><svg class="ic"><use href="#i-car"/></svg>I parked here</button>
   <div class="actions">
    <button type="button" class="act" id="shareBtn"><svg class="ic"><use href="#i-share"/></svg>Share</button>
    <button type="button" class="act" id="saveBtn"><svg class="ic"><use href="#i-bookmark"/></svg>Save spot</button>
@@ -528,10 +587,10 @@ input.switch:checked::after{transform:translateX(20px)}
 
 <div class="checkbar"><button type="button" id="checkBtn" class="btn btn-primary"><svg class="ic"><use href="#i-check"/></svg><span id="checkLabel">Check parking</span></button></div>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<script src="rules.js?v=3157557.1"></script>
+<script src="rules.js?v=2f5c43c.1"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/proj4@2.11.0/dist/proj4.js"></script>
-<script src="signs.js?v=3157557.1"></script>
+<script src="signs.js?v=2f5c43c.1"></script>
 <script>
 // Partner (affiliate) IDs for the garage card. Leave empty for plain links; they are added only when set.
 //  spothero: your SpotHero affiliate id (e.g. '1234'), or a full tracking-link prefix starting with https:// that the destination URL gets appended to (URL-encoded)
@@ -567,6 +626,7 @@ fetch('asp.json').then(r=>r.json()).then(j=>{ASP=j;
   const up=Object.entries(j.holidays).filter(([k])=>k>key).sort()[0];
   if(up){ const d=new Date(up[0]+'T12:00'); status+=`<div class="asp-next">Next suspension: ${d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})} · ${esc(up[1].name)}</div>`; details+=`<br>Next suspension: ${d.toDateString()} (${esc(up[1].name)}).`; }
   $('aspBox').className='asp '+kind; $('aspStatus').innerHTML=status; $('aspDetails').innerHTML=details;
+  renderCar();
 }).catch(()=>{ $('aspStatus').textContent='Could not load ASP status.'; $('aspMore').hidden=true; });
 // ---- location ----
 function setLocHtml(label, lat, lon, acc){
@@ -831,6 +891,7 @@ function check(opts){
     whenKind:r.canPark?(r.nextViolation?'move':''):(r.okAt?'open':''),
     isTimeLimit:!!(r.canPark&&r.violationIsTimeLimit),
     rules:sides.flatMap(s=>s.rules||[]),
+    sides,
     commercial:isCom,
     vehMatters,
     at:now
@@ -1244,6 +1305,132 @@ $('fillBtn').onclick=fillNearest;
 $('shareBtn').onclick=onShare;
 $('saveBtn').onclick=onSave;
 $('icsBtn').onclick=onIcs;
+// ---- I parked here / Your car / Find my car ----
+const CAR_KEY='parkhero-car', CAR_HIST='parkhero-car-history', BASE_TITLE=document.title;
+let carTimer=null, carMap=null, carPin=null, mePin=null, meAt=null, carSaving=false;
+function readCar(){ try{ const c=JSON.parse(localStorage.getItem(CAR_KEY)||'null'); return c&&c.v===1?c:null; }catch(e){ return null; } }
+function writeCar(c){ try{ c?localStorage.setItem(CAR_KEY,JSON.stringify(c)):localStorage.removeItem(CAR_KEY); }catch(e){} }
+function carHasLL(c){ return !!(c&&c.lat!=null&&c.lon!=null); }
+function carNow(){ const c=readCar(); return c?{car:c, status:NYCSigns.carStatus(c,new Date(),ASP.holidays,NYCRules)}:null; }
+function saveCar(coords, note){
+  const c=NYCSigns.makeCar({
+    parkedAt:new Date(), lat:coords&&coords.lat, lon:coords&&coords.lon, acc:coords&&coords.acc,
+    address:placeAddress()||(place&&place.label)||'',
+    sides:lastCheck?lastCheck.sides:[], commercial:lastCheck?lastCheck.commercial:$('commercial').checked,
+    verdict:lastCheck?lastCheck.verdictLine:''
+  });
+  const old=readCar(); if(old) pushCarHistory(old);
+  writeCar(c); closeCarFind(); renderCar();
+  $('shareStatus').textContent=note||'Saved where you parked. The countdown is at the top.';
+  $('carStatus').textContent=note&&/without/.test(note)?note:'';
+  $('carCard').scrollIntoView({behavior:'smooth', block:'start'});
+}
+function pushCarHistory(c){ try{ const h=JSON.parse(localStorage.getItem(CAR_HIST)||'[]'); h.unshift(Object.assign({}, c, {clearedAt:new Date().toISOString()})); localStorage.setItem(CAR_HIST, JSON.stringify(h.slice(0,10))); }catch(e){} }
+function onParked(){
+  if(carSaving) return;
+  if(place&&place.lat!=null&&place.lon!=null) return saveCar({lat:place.lat, lon:place.lon, acc:place.acc});
+  if(!navigator.geolocation) return saveCar(null, placeAddress()?'Saved without GPS (location is not available here). Find my car will use the address.':'Saved without GPS (location is not available here) and no address. Make a note of where you parked.');
+  carSaving=true; const btn=$('parkedBtn'); btn.disabled=true; $('shareStatus').textContent='Getting your location…';
+  navigator.geolocation.getCurrentPosition(pos=>{ carSaving=false; btn.disabled=false;
+    saveCar({lat:pos.coords.latitude, lon:pos.coords.longitude, acc:pos.coords.accuracy});
+  }, ()=>{ carSaving=false; btn.disabled=false;
+    saveCar(null, placeAddress()?'Saved without GPS (no location fix). Find my car will use the address.':'Saved without GPS (no location fix) and no address. Make a note of where you parked.');
+  }, {enableHighAccuracy:true, timeout:10000, maximumAge:60000});
+}
+function setBadge(view){
+  document.title=readCar()?NYCSigns.carDocTitle(view):BASE_TITLE;
+  try{ if(view&&view.soon&&navigator.setAppBadge) navigator.setAppBadge(1).catch(()=>{}); else if(navigator.clearAppBadge) navigator.clearAppBadge().catch(()=>{}); }catch(e){}
+}
+function renderCar(){
+  const cur=carNow(), card=$('carCard');
+  if(!cur){ card.hidden=true; clearInterval(carTimer); carTimer=null; setBadge(null); return; }
+  const {car, status}=cur, now=new Date(), view=NYCSigns.carView(status, now);
+  card.hidden=false;
+  card.className='car-card '+view.tone;
+  $('carAddr').textContent=car.address?NYCSigns.tidyAddress(car.address):(carHasLL(car)?'Pinned on the map':'No location saved');
+  $('carTitle').textContent=view.title;
+  $('carDetail').textContent=(status.state==='ok'?(status.timeLimit?'Time limit ends in ':'Violation starts in ')+view.detail.replace(/ left$/,'')+'.':view.detail)+' Parked '+NYCSigns.pastText(car.parkedAt, now)+'.';
+  $('carPill').textContent=status.state==='ok'?view.short:status.state==='violation'?'Move now':status.state==='none'?'All week':'';
+  // Garage link when time is short or the spot is no longer legal
+  const g=$('carGarage');
+  if(view.soon&&(status.state==='ok'||status.state==='violation')){
+    const l=NYCSigns.garageLinks({lat:car.lat, lon:car.lon, address:car.address, now, legalAt:status.state==='violation'?status.okAt:null, affiliate:AFFILIATE});
+    if(l){ $('carSH').href=l.spothero; $('carPW').href=l.parkwhiz; g.hidden=false; } else g.hidden=true;
+  } else g.hidden=true;
+  $('carRemind').disabled=false;
+  setBadge(view);
+  if(!carTimer) carTimer=setInterval(renderCar, 30000);
+  if(!$('carFind').hidden) updateWalk();
+}
+function onCarRemind(){
+  const cur=carNow(); if(!cur) return;
+  const s=cur.status, dl=s.deadline;
+  if(!dl){ $('carStatus').textContent=s.state==='violation'?'Move the car now. There is nothing to wait for.':'No move-by time in the next two weeks, so there is nothing to remind you about.'; return; }
+  const when=NYCSigns.moveByText(dl);
+  const body=NYCSigns.carShareText(cur.car, s, new Date()).replace(/ \([^)]*left\)/,''); // no countdown: it would be stale when the alert fires
+  const ics=NYCSigns.icsReminder(dl, new Date(), 'Move your car by '+when, body);
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([ics],{type:'text/calendar'})); a.download='move-the-car.ics'; a.click();
+  const r=NYCSigns.reminderAt(dl, new Date());
+  $('carStatus').textContent='Downloaded a reminder for '+NYCSigns.moveByText(r)+'. Open it to add it to your calendar.';
+}
+async function onCarShare(){
+  const cur=carNow(); if(!cur) return;
+  const text=NYCSigns.carShareText(cur.car, cur.status, new Date());
+  if(navigator.share){ try{ await navigator.share({title:'My car · ParkHero', text}); $('carStatus').textContent='Shared.'; return; }catch(e){ if(e&&e.name==='AbortError') return; } }
+  try{ await navigator.clipboard.writeText(text); $('carStatus').textContent='Copied where your car is and the countdown.'; }
+  catch(e){ $('carStatus').textContent=text; }
+}
+function onCarClear(){
+  const c=readCar(); if(!c) return;
+  pushCarHistory(c); writeCar(null); closeCarFind(); renderCar();
+  $('shareStatus').textContent='Cleared your parked car.';
+}
+function closeCarFind(){ $('carFind').hidden=true; $('carFindBtn').setAttribute('aria-expanded','false'); }
+function updateWalk(){
+  const c=readCar(); if(!c) return;
+  const ios=NYCSigns.isIOS(navigator.userAgent, navigator.platform, navigator.maxTouchPoints);
+  const url=NYCSigns.directionsUrl(c, ios), btn=$('carWalkBtn');
+  if(url){ btn.href=url; btn.hidden=false; btn.lastChild.textContent='Walk there'+(ios?' in Apple Maps':''); } else btn.hidden=true;
+  const w=meAt&&carHasLL(c)?NYCSigns.walkInfo(meAt, c):null;
+  const addr=c.address?NYCSigns.tidyAddress(c.address):'';
+  if(!carHasLL(c)) $('carWalk').innerHTML=addr?`${esc(addr)}<small>Saved without GPS, so directions use the address.</small>`:'No location was saved for this car.<small>Check where you parked.</small>';
+  else $('carWalk').innerHTML=w?`${esc(w.text)}<small>${esc(addr||'Pinned spot')} · straight-line distance</small>`:`${esc(addr||'Your car')}<small>${meAt===false?'Turn on location to see how far it is.':'Finding you…'}</small>`;
+}
+function onCarFind(){
+  const c=readCar(); if(!c) return;
+  if(!$('carFind').hidden){ closeCarFind(); return; }
+  $('carFind').hidden=false; $('carFindBtn').setAttribute('aria-expanded','true');
+  $('carMapWrap').hidden=!carHasLL(c);
+  meAt=null; updateWalk();
+  if(carHasLL(c)&&typeof L!=='undefined'){
+    const ll=[c.lat,c.lon];
+    if(!carMap){
+      carMap=L.map('carMap',{zoomControl:true, attributionControl:true}).setView(ll,17);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19, attribution:'© OpenStreetMap'}).addTo(carMap);
+      carPin=L.marker(ll,{title:'Your car', keyboard:false, icon:L.divIcon({className:'car-pin', html:'<span><svg viewBox="0 0 24 24"><use href="#i-car"/></svg></span>', iconSize:[34,34], iconAnchor:[17,17]})}).addTo(carMap);
+    } else { carPin.setLatLng(ll); carMap.setView(ll,17); if(mePin){ mePin.remove(); mePin=null; } }
+    setTimeout(()=>carMap.invalidateSize(), 60);
+  } else if(carHasLL(c)) $('carMapWrap').hidden=true;
+  if(!carHasLL(c)||!navigator.geolocation){ if(carHasLL(c)) { meAt=false; updateWalk(); } return; }
+  navigator.geolocation.getCurrentPosition(pos=>{
+    meAt={lat:pos.coords.latitude, lon:pos.coords.longitude}; updateWalk();
+    if(carMap){
+      if(!mePin) mePin=L.marker([meAt.lat,meAt.lon],{title:'You', keyboard:false, icon:L.divIcon({className:'me-pin', html:'<span></span>', iconSize:[18,18], iconAnchor:[9,9]})}).addTo(carMap);
+      else mePin.setLatLng([meAt.lat,meAt.lon]);
+      carMap.fitBounds(L.latLngBounds([[c.lat,c.lon],[meAt.lat,meAt.lon]]),{padding:[36,36], maxZoom:18});
+    }
+  }, ()=>{ meAt=false; updateWalk(); }, {enableHighAccuracy:true, timeout:10000, maximumAge:30000});
+}
+$('parkedBtn').onclick=onParked;
+$('carRemind').onclick=onCarRemind;
+$('carShare').onclick=onCarShare;
+$('carClear').onclick=onCarClear;
+$('carFindBtn').onclick=onCarFind;
+['carSH','carPW'].forEach(id=>$(id).addEventListener('click',()=>{ const cur=carNow(); if(!cur) return; const l=NYCSigns.garageLinks({lat:cur.car.lat, lon:cur.car.lon, address:cur.car.address, now:new Date(), legalAt:cur.status.okAt||null, affiliate:AFFILIATE}); if(l) $(id).href=id==='carSH'?l.spothero:l.parkwhiz; }));
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') renderCar(); });
+window.addEventListener('pageshow',renderCar);
+window.addEventListener('storage',e=>{ if(e.key===CAR_KEY) renderCar(); });
+renderCar();
 renderSpots();
 (function restore(){
   let st=null;

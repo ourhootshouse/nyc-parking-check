@@ -410,3 +410,114 @@ test('themeFor resolves auto/light/dark and the bar colour', () => {
   assert.equal(Signs.themeFor(null, false).pref, 'auto');
   assert.equal(Signs.themeFor('purple', true).mode, 'dark');
 });
+
+// ---- I parked here: countdown and state ----
+const ASPH = require('./asp.json').holidays;
+const carAt = (text, parkedAt, extra) => Signs.makeCar(Object.assign({ parkedAt, lat: 40.80954, lon: -73.94702, address: '165 W 126th St, Manhattan', sides: [{ id: 'front', arrow: 'toward', rules: NYC.parse(text).rules }] }, extra || {}));
+const T = s => new Date(s);
+
+test('makeCar stores a JSON-safe snapshot', () => {
+  const c = carAt('NO PARKING 7AM-7PM EXCEPT SUNDAY', '2026-10-30T20:15:00-04:00', { commercial: true, lat: '', lon: undefined });
+  const back = JSON.parse(JSON.stringify(c));
+  assert.deepEqual(back, c);
+  assert.equal(c.lat, null); assert.equal(c.lon, null); assert.equal(c.commercial, true);
+  assert.equal(c.parkedAt, '2026-10-31T00:15:00.000Z');
+  assert.equal(Signs.carHasRules(c), true);
+  assert.equal(Signs.carHasRules(Signs.makeCar({ sides: [{ id: 'front', arrow: 'away', rules: NYC.parse('NO PARKING ANYTIME').rules }] })), false);
+});
+
+test('carStatus counts down to the next violation, with green/amber/red tones', () => {
+  const car = carAt('NO PARKING 7AM-7PM EXCEPT SUNDAY', '2026-10-30T20:15:00-04:00');
+  let s = Signs.carStatus(car, T('2026-10-30T22:48:00-04:00'), ASPH, NYC);
+  assert.equal(s.state, 'ok');
+  assert.equal(+s.deadline, +T('2026-10-31T07:00:00-04:00'));
+  let v = Signs.carView(s, T('2026-10-30T22:48:00-04:00'));
+  assert.equal(v.tone, 'green'); assert.equal(v.title, 'Move by 7:00 AM Sat'); assert.equal(v.detail, '8h 12m left');
+  v = Signs.carView(Signs.carStatus(car, T('2026-10-31T05:30:00-04:00'), ASPH, NYC), T('2026-10-31T05:30:00-04:00'));
+  assert.equal(v.tone, 'amber'); assert.equal(v.detail, '1h 30m left'); assert.equal(v.soon, true);
+  v = Signs.carView(Signs.carStatus(car, T('2026-10-31T06:45:00-04:00'), ASPH, NYC), T('2026-10-31T06:45:00-04:00'));
+  assert.equal(v.tone, 'red'); assert.equal(v.detail, '15m left');
+  // exactly 2h is amber, just over is green
+  assert.equal(Signs.carView({ state: 'ok', deadline: T('2026-10-31T07:00:00-04:00'), left: 2 * 3600e3 }).tone, 'amber');
+  assert.equal(Signs.carView({ state: 'ok', deadline: T('2026-10-31T07:00:00-04:00'), left: 2 * 3600e3 + 60000 }).tone, 'green');
+  // past the deadline: in violation, red, with when it is OK again
+  s = Signs.carStatus(car, T('2026-10-31T08:00:00-04:00'), ASPH, NYC);
+  assert.equal(s.state, 'violation'); assert.equal(+s.okAt, +T('2026-10-31T19:00:00-04:00'));
+  v = Signs.carView(s, T('2026-10-31T08:00:00-04:00'));
+  assert.equal(v.tone, 'red'); assert.equal(v.title, 'Move the car now');
+  assert.match(v.detail, /7:00 PM today/);
+  // once the window is over, it rolls on to the next one (Sunday is free, so Monday 7 AM)
+  s = Signs.carStatus(car, T('2026-10-31T20:00:00-04:00'), ASPH, NYC);
+  assert.equal(s.state, 'ok'); assert.equal(+s.deadline, +T('2026-11-02T07:00:00-05:00'));
+});
+
+test('carStatus across the DST change counts real hours', () => {
+  // Parked Sat Oct 31, 10 PM EDT; clocks fall back Sun Nov 1 at 2 AM; next window Mon 8 AM EST.
+  const car = carAt('NO PARKING 8AM-6PM MON-FRI', '2026-10-31T22:00:00-04:00');
+  const now = T('2026-10-31T22:00:00-04:00');
+  const s = Signs.carStatus(car, now, ASPH, NYC);
+  assert.equal(+s.deadline, +T('2026-11-02T08:00:00-05:00'));
+  assert.equal(s.left, 35 * 3600e3); // 34 wall-clock hours + the extra hour
+  assert.equal(Signs.carView(s, now).title, 'Move by 8:00 AM Mon');
+  assert.equal(Signs.carView(s, now).detail, '1d 11h left');
+});
+
+test('carStatus honours ASP suspensions and says when no move is needed this week', () => {
+  const car = carAt('NO PARKING (SANITATION BROOM SYMBOL) 8:30AM-10AM TUESDAY', '2026-11-02T12:00:00-05:00');
+  const now = T('2026-11-02T12:00:00-05:00');
+  // Tue Nov 3 is Election Day (ASP suspended) -> next cleaning Tue Nov 10, more than 7 days away
+  let s = Signs.carStatus(car, now, ASPH, NYC);
+  assert.equal(s.state, 'none');
+  assert.equal(Signs.carView(s, now).title, 'No move needed this week');
+  assert.equal(Signs.carView(s, now).tone, 'green');
+  // without the suspension it would be tomorrow morning
+  s = Signs.carStatus(car, now, {}, NYC);
+  assert.equal(s.state, 'ok'); assert.equal(+s.deadline, +T('2026-11-03T08:30:00-05:00'));
+  // a sign with nothing upcoming at all
+  s = Signs.carStatus(carAt('NO STANDING 7AM-10AM MON-FRI', '2026-10-30T12:00:00-04:00', { sides: [{ id: 'front', arrow: 'away', rules: NYC.parse('NO STANDING ANYTIME').rules }] }), now, ASPH, NYC);
+  assert.equal(s.state, 'unknown');
+  assert.equal(Signs.carView(s, now).tone, 'amber');
+});
+
+test('carStatus: time limits count from parking time, including ones that start later', () => {
+  const car = carAt('2 HOUR PARKING 9AM-7PM EXCEPT SUNDAY', '2026-10-30T10:00:00-04:00');
+  let s = Signs.carStatus(car, T('2026-10-30T11:30:00-04:00'), ASPH, NYC);
+  assert.equal(s.state, 'ok'); assert.equal(s.timeLimit, true);
+  assert.equal(+s.deadline, +T('2026-10-30T12:00:00-04:00')); // not 11:30 + 2h
+  assert.equal(Signs.carView(s, T('2026-10-30T11:30:00-04:00')).title, 'Time is up at 12:00 PM Fri');
+  s = Signs.carStatus(car, T('2026-10-30T12:30:00-04:00'), ASPH, NYC);
+  assert.equal(s.state, 'violation'); assert.equal(Signs.carView(s, T('2026-10-30T12:30:00-04:00')).title, 'Time is up. Move the car');
+  // parked overnight before a 2-hour window: must leave 2h after it starts
+  const night = carAt('2 HOUR PARKING 9AM-7PM EXCEPT SUNDAY', '2026-10-29T22:00:00-04:00');
+  s = Signs.carStatus(night, T('2026-10-29T23:00:00-04:00'), ASPH, NYC);
+  assert.equal(+s.deadline, +T('2026-10-30T11:00:00-04:00'));
+});
+
+test('car helpers: reminder, walking distance, directions, share text, title', () => {
+  const now = T('2026-10-30T22:48:00-04:00'), dl = T('2026-10-31T07:00:00-04:00');
+  assert.equal(+Signs.reminderAt(dl, now), +T('2026-10-31T06:30:00-04:00'));
+  assert.equal(+Signs.reminderAt(T('2026-10-30T23:00:00-04:00'), now), +now + 60000); // never in the past
+  const ics = Signs.icsReminder(dl, now, 'Move your car by 7:00 AM', 'x');
+  assert.match(ics, /DTSTART:20261031T103000Z/); assert.match(ics, /BEGIN:VALARM/); assert.match(ics, /TRIGGER:PT0M/);
+  const w = Signs.walkInfo({ lat: 40.80954, lon: -73.94702 }, { lat: 40.8139, lon: -73.9441 }); // ~0.34 mi
+  assert.equal(w.text, '0.3 mi, about 7 min walk');
+  assert.match(Signs.walkInfo({ lat: 40.80954, lon: -73.94702 }, { lat: 40.8100, lon: -73.9470 }).text, /^\d+0 ft, about 1 min walk$/);
+  assert.equal(Signs.walkInfo(null, { lat: 1, lon: 1 }), null);
+  assert.equal(Signs.walkInfo({ lat: 40.80954, lon: -73.94702 }, { lat: 40.80955, lon: -73.94702 }).text, 'You are right by your car');
+  const car = carAt('NO PARKING 7AM-7PM EXCEPT SUNDAY', '2026-10-30T20:15:00-04:00');
+  assert.equal(Signs.directionsUrl(car, true), 'https://maps.apple.com/?daddr=40.80954,-73.94702&dirflg=w');
+  assert.equal(Signs.directionsUrl(car, false), 'https://www.google.com/maps/dir/?api=1&destination=40.80954,-73.94702&travelmode=walking');
+  const noGps = Object.assign({}, car, { lat: null, lon: null });
+  assert.equal(Signs.directionsUrl(noGps, true), 'https://maps.apple.com/?daddr=165%20W%20126th%20St,%20Manhattan&dirflg=w');
+  assert.match(Signs.directionsUrl(noGps, false), /destination=165%20W%20126th%20St,%20Manhattan&travelmode=walking$/);
+  assert.equal(Signs.directionsUrl(Object.assign({}, noGps, { address: '' }), true), null);
+  assert.equal(Signs.isIOS('Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X)'), true);
+  assert.equal(Signs.isIOS('Mozilla/5.0 (Macintosh)', 'MacIntel', 5), true);
+  assert.equal(Signs.isIOS('Mozilla/5.0 (Linux; Android 14)'), false);
+  const st = Signs.carStatus(car, now, ASPH, NYC);
+  const text = Signs.carShareText(car, st, now);
+  assert.equal(text, '🚗 My car is at 165 W 126th St, Manhattan\n⏰ Move by 7:00 AM Sat (8h 12m left)\n🅿️ Parked at 8:15 PM\n📍 https://maps.google.com/?q=40.80954,-73.94702');
+  assert.equal(Signs.carDocTitle(Signs.carView(st, now)), '⏱ 8h 12m left · ParkHero');
+  assert.equal(Signs.leftText(25 * 3600e3), '1d 1h'); assert.equal(Signs.leftText(59 * 60000), '59m'); assert.equal(Signs.leftText(20000), 'under 1m');
+  assert.equal(Signs.pastText(T('2026-10-29T21:00:00-04:00'), now), '9:00 PM yesterday');
+});

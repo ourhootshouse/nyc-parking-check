@@ -464,11 +464,149 @@
     ].join('\r\n');
   }
 
+  // ---- "I parked here": the active car, its countdown, and finding it again ----
+  // car: { v:1, parkedAt:ISO, lat, lon, acc, address, sides:[{id, arrow, rules}], commercial, verdict }
+  function makeCar(info) {
+    const i = info || {};
+    const num = x => (x === null || x === undefined || x === '' || !isFinite(x)) ? null : Number(x);
+    const sides = (i.sides || []).map(s => ({ id: s.id || null, arrow: s.arrow || 'toward', rules: JSON.parse(JSON.stringify(s.rules || [])) }));
+    return {
+      v: 1, id: String(i.id || new Date(i.parkedAt || Date.now()).getTime()),
+      parkedAt: new Date(i.parkedAt || Date.now()).toISOString(),
+      lat: num(i.lat), lon: num(i.lon), acc: num(i.acc), address: String(i.address || ''),
+      sides, commercial: !!i.commercial, verdict: String(i.verdict || '')
+    };
+  }
+  function carHasRules(car) { return !!(car && (car.sides || []).some(s => s.arrow !== 'away' && (s.rules || []).length)); }
+  // Where the car stands at `now`. Walks forward from the moment it was parked, so a time limit counts from parking time
+  // and a window that already came and went is accounted for. engine = NYCRules.
+  //  {state:'ok', deadline, left, timeLimit}  - legal now; must move by deadline
+  //  {state:'none'}                          - nothing within 7 days
+  //  {state:'violation', since, okAt}        - not allowed right now
+  //  {state:'unknown'}                       - no sign rules saved
+  function carStatus(car, now, holidays, engine) {
+    now = new Date(now || Date.now());
+    if (!carHasRules(car)) return { state: 'unknown' };
+    const opts = { commercial: !!car.commercial }, H = holidays || {};
+    const ev = t => engine.evaluateSides(car.sides, new Date(t), H, opts);
+    let t = new Date(Math.min(new Date(car.parkedAt).getTime(), now.getTime()));
+    for (let guard = 0; guard < 60; guard++) {
+      const r = ev(t);
+      if (!r.canPark) {
+        if (r.okAt && r.okAt <= now) { t = new Date(r.okAt); continue; }
+        return { state: 'violation', since: t > new Date(car.parkedAt) ? t : null, okAt: r.okAt || null, rules: r.blockedBy || [] };
+      }
+      let deadline = r.nextViolation ? new Date(r.nextViolation) : null, timeLimit = !!r.violationIsTimeLimit;
+      // A time limit that starts later (e.g. 2-hour parking from 8 AM) also ends the stay.
+      if (!timeLimit && r.upcomingLimit && (!deadline || r.upcomingLimit.start < deadline)) {
+        const rl = ev(r.upcomingLimit.start);
+        if (rl.canPark && rl.violationIsTimeLimit && rl.nextViolation && (!deadline || rl.nextViolation < deadline)) { deadline = new Date(rl.nextViolation); timeLimit = true; }
+      }
+      if (!deadline) return { state: 'none' };
+      if (deadline > now) {
+        if (deadline - now > 7 * 864e5) return { state: 'none', deadline };
+        return { state: 'ok', deadline, left: deadline - now, timeLimit, rules: r.nextRules || [] };
+      }
+      if (timeLimit) return { state: 'violation', since: deadline, okAt: null, timeLimit: true };
+      t = deadline;
+    }
+    return { state: 'unknown' };
+  }
+  function leftText(ms) {
+    const m = Math.max(0, Math.floor(ms / 60000));
+    if (m < 1) return 'under 1m';
+    const d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mi = m % 60;
+    if (d) return d + 'd' + (h ? ' ' + h + 'h' : '');
+    if (h) return h + 'h' + (mi ? ' ' + mi + 'm' : '');
+    return mi + 'm';
+  }
+  // "7:00 AM Fri"
+  function moveByText(d) { return timeText(d) + ' ' + WD[nyDay(d).wd]; }
+  // A time in the past: "7:00 AM" today, "7:00 AM yesterday", or "7:00 AM Mon"
+  function pastText(d, now) {
+    const diff = nyDay(now || new Date()).utcDay - nyDay(d).utcDay;
+    return timeText(d) + (diff <= 0 ? '' : diff === 1 ? ' yesterday' : ' ' + WD[nyDay(d).wd]);
+  }
+  // What the Your car card says. tone: green > 2h left, amber under 2h, red under 30m or in violation.
+  function carView(status, now) {
+    now = new Date(now || Date.now());
+    const s = status || { state: 'unknown' };
+    if (s.state === 'ok') {
+      const tone = s.left < 30 * 60000 ? 'red' : s.left <= 2 * 3600e3 ? 'amber' : 'green';
+      const lt = leftText(s.left);
+      return { tone, title: (s.timeLimit ? 'Time is up at ' : 'Move by ') + moveByText(s.deadline), detail: lt + ' left', short: lt + ' left', soon: s.left <= 2 * 3600e3 };
+    }
+    if (s.state === 'none') return { tone: 'green', title: 'No move needed this week', detail: 'Nothing on these signs for the next 7 days.', short: 'OK this week', soon: false };
+    if (s.state === 'violation') {
+      const title = s.timeLimit ? 'Time is up. Move the car' : 'Move the car now';
+      const detail = s.okAt ? 'Parking here is not allowed until ' + whenText(s.okAt, now) + '.' : s.since ? 'Not allowed here since ' + pastText(s.since, now) + '.' : 'Parking here is not allowed right now.';
+      return { tone: 'red', title, detail, short: 'Move now', soon: true };
+    }
+    return { tone: 'amber', title: 'Check the signs before you leave it', detail: 'No sign rules were saved with this spot.', short: '', soon: false };
+  }
+  // Reminder time for the .ics: 30 minutes before the deadline, but never in the past.
+  function reminderAt(deadline, now) {
+    const n = new Date(now || Date.now()).getTime(), d = new Date(deadline).getTime();
+    return new Date(Math.max(d - 30 * 60000, n + 60000));
+  }
+  function icsReminder(deadline, now, title, description) {
+    const start = reminderAt(deadline, now);
+    const end = new Date(Math.max(new Date(deadline).getTime(), start.getTime() + 15 * 60000));
+    return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//ParkHero//EN', 'BEGIN:VEVENT',
+      'UID:parkhero-' + start.getTime() + '@parkhero', 'DTSTAMP:' + icsStamp(now || new Date()),
+      'DTSTART:' + icsStamp(start), 'DTEND:' + icsStamp(end),
+      'SUMMARY:' + icsEscape(title), 'DESCRIPTION:' + icsEscape(description),
+      'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + icsEscape(title), 'TRIGGER:PT0M', 'END:VALARM',
+      'END:VEVENT', 'END:VCALENDAR', ''].join('\r\n');
+  }
+  // Walking distance (straight line) and a rough time at 3 mph.
+  function walkInfo(a, b) {
+    if (!a || !b || [a.lat, a.lon, b.lat, b.lon].some(x => x == null || !isFinite(x))) return null;
+    const R = 6371008.8, rad = x => x * Math.PI / 180;
+    const dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
+    const meters = 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+    const miles = meters / 1609.344, mins = Math.max(1, Math.round(miles * 20));
+    const dist = miles < 0.1 ? Math.round(meters * 3.28084 / 10) * 10 + ' ft' : (miles < 10 ? miles.toFixed(1) : Math.round(miles)) + ' mi';
+    if (meters < 15) return { meters, miles, mins: 0, text: 'You are right by your car' };
+    return { meters, miles, mins, text: dist + ', about ' + mins + ' min walk' };
+  }
+  function isIOS(ua, platform, touchPoints) {
+    ua = String(ua || '');
+    return /iPhone|iPad|iPod/.test(ua) || (platform === 'MacIntel' && touchPoints > 1);
+  }
+  // Walking directions: Apple Maps on iOS, Google Maps elsewhere. Falls back to the address when there are no coordinates.
+  function directionsUrl(car, ios) {
+    const has = car && car.lat != null && car.lon != null && isFinite(car.lat) && isFinite(car.lon);
+    const addr = car && car.address ? tidyAddress(car.address).replace(/, NYC$/, ', New York, NY') : '';
+    if (!has && !addr) return null;
+    const dest = has ? round5(car.lat) + ',' + round5(car.lon) : addr;
+    return ios ? 'https://maps.apple.com/?daddr=' + encodeURIComponent(dest).replace(/%2C/g, ',') + '&dirflg=w'
+      : 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(dest).replace(/%2C/g, ',') + '&travelmode=walking';
+  }
+  function carMapLink(car) {
+    const has = car && car.lat != null && car.lon != null && isFinite(car.lat) && isFinite(car.lon);
+    if (has) return 'https://maps.google.com/?q=' + round5(car.lat) + ',' + round5(car.lon);
+    return car && car.address ? 'https://maps.google.com/?q=' + encodeURIComponent(tidyAddress(car.address)) : null;
+  }
+  function carShareText(car, status, now) {
+    const v = carView(status, now);
+    const where = car && car.address ? tidyAddress(car.address) : '';
+    const lines = ['🚗 My car' + (where ? ' is at ' + where : '')];
+    if (status && status.state === 'ok') lines.push('⏰ ' + v.title + ' (' + v.detail + ')');
+    else lines.push('⏰ ' + v.title);
+    lines.push('🅿️ Parked at ' + pastText(car.parkedAt, now));
+    const link = carMapLink(car); if (link) lines.push('📍 ' + link);
+    return lines.join('\n');
+  }
+  function carDocTitle(view) { return view && view.short ? '⏱ ' + view.short + ' · ParkHero' : 'ParkHero · NYC parking sign checker'; }
+
   const api = {
     expandCityDescription, isLocator, compassRelative, signsForSlot,
     estimatePinDistance, groupPoles, pickFrontBehind,
     encodeState, decodeState, encodeStateV2, decodeStateV2, shareHash, stateFromHash,
-    whenText, vehicleMatters, friendlyRule, signSummary, tidyAddress, shareText, garageWindow, garageLinks, garagePlan, themeFor, nyLocalMinute, nyIsoOffset, shareSummary, icsEvent
+    whenText, vehicleMatters, friendlyRule, signSummary, tidyAddress, shareText, garageWindow, garageLinks, garagePlan, themeFor, nyLocalMinute, nyIsoOffset, shareSummary, icsEvent,
+    makeCar, carHasRules, carStatus, carView, leftText, moveByText, pastText, reminderAt, icsReminder, walkInfo, isIOS, directionsUrl, carMapLink, carShareText, carDocTitle
   };
   if (typeof module !== 'undefined') module.exports = api; else root.NYCSigns = api;
 })(this);
