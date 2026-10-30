@@ -236,3 +236,38 @@ test('whenText uses relative day words', () => {
   assert.equal(Signs.whenText(new Date('2026-11-03T08:00:00-05:00'), now), '8:00 AM on Tuesday');
   assert.equal(Signs.whenText(new Date('2026-11-09T09:00:00-05:00'), now), '9:00 AM on Mon, Nov 9');
 });
+
+// ---- commercial plates ----
+test('commercial switch changes the verdict only on commercial-aware signs', () => {
+  const now = new Date('2026-10-30T10:00:00-04:00'); // Fri, restricted hours
+  const ev = (t, commercial) => NYC.evaluate(NYC.parse(t).rules, now, {}, { commercial });
+  const hmp = '3 HOUR METERED PARKING COMMERCIAL VEHICLES ONLY 7AM-7PM EXCEPT SUNDAY';
+  assert.equal(ev(hmp, false).canPark, false);
+  assert.equal(ev(hmp, true).canPark, true);
+  assert.equal(ev(hmp, true).limit.minutes, 180);
+  assert.equal(ev('COMMERCIAL VEHICLES ONLY 7AM-7PM', false).canPark, false);
+  assert.equal(ev('COMMERCIAL VEHICLES ONLY 7AM-7PM', true).canPark, true);
+  const a = ev('NO PARKING 7AM-7PM', false), b = ev('NO PARKING 7AM-7PM', true);
+  assert.equal(a.canPark, b.canPark);
+  assert.equal(+a.okAt, +b.okAt);
+});
+
+test('vehicleMatters flags only commercial-aware rules', () => {
+  const rules = t => NYC.parse(t).rules;
+  assert.equal(Signs.vehicleMatters(rules('3 HOUR METERED PARKING COMMERCIAL VEHICLES ONLY 7AM-7PM EXCEPT SUNDAY')), true);
+  assert.equal(Signs.vehicleMatters(rules('COMMERCIAL VEHICLES ONLY 7AM-7PM')), true);
+  assert.equal(Signs.vehicleMatters(rules('NO PARKING 7AM-7PM')), false);
+  assert.equal(Signs.vehicleMatters(rules('2 HOUR METERED PARKING 9AM-7PM EXCEPT SUNDAY')), false);
+  assert.equal(Signs.vehicleMatters([]), false);
+});
+
+test('share text names the vehicle only when the sign cares', () => {
+  const now = new Date('2026-10-30T10:00:00-04:00');
+  const rules = t => NYC.parse(t).rules.map(r => Object.assign(r, { side: 'front' }));
+  const com = Signs.shareText({ canPark: true, now, rules: rules('COMMERCIAL VEHICLES ONLY 7AM-7PM'), commercial: true });
+  assert.match(com, /\(For commercial plates\.\)$/);
+  const pas = Signs.shareText({ canPark: false, now, when: new Date('2026-10-30T19:00:00-04:00'), rules: rules('COMMERCIAL VEHICLES ONLY 7AM-7PM'), commercial: false });
+  assert.match(pas, /\(For a passenger car\.\)$/);
+  const plain = Signs.shareText({ canPark: false, now, when: new Date('2026-10-30T19:00:00-04:00'), rules: rules('NO PARKING 7AM-7PM'), commercial: true });
+  assert.ok(!/commercial|passenger/i.test(plain), plain);
+});

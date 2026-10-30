@@ -291,6 +291,10 @@
     if (BOROUGHS.some(b => b.toLowerCase() === street.toLowerCase())) return street;
     return street + ', ' + (borough || 'NYC');
   }
+  // True when any applied rule depends on commercial vs passenger plates.
+  function vehicleMatters(rules) {
+    return (rules || []).some(r => r && !r.badWindow && (r.type === 'COMMERCIAL_ONLY' || r.commercialOnly));
+  }
   // Friendly, scannable share text. info:
   //  canPark, when (Date: move-by or OK-at), isTimeLimit, now, rules (applied parsed rules with .side),
   //  address (raw label), commercial, url, linkInText (default false: Web Share passes url separately)
@@ -314,7 +318,8 @@
     const addr = tidyAddress(i.address);
     if (addr) lines.push('📍 ' + addr);
     let detail = signSummary(i.rules);
-    if (i.commercial) detail = (detail ? detail + ' ' : '') + '(Checked for commercial plates.)';
+    // Only mention vehicle type when a sign that applied treats commercial plates differently.
+    if (vehicleMatters(i.rules)) detail = (detail ? detail + ' ' : '') + (i.commercial ? '(For commercial plates.)' : '(For a passenger car.)');
     if (detail) lines.push(detail);
     let out = lines.join('\n');
     if (i.url && i.linkInText) out += '\n\nCheck it in ParkHero: ' + i.url;
@@ -361,7 +366,7 @@
     expandCityDescription, isLocator, compassRelative, signsForSlot,
     estimatePinDistance, groupPoles, pickFrontBehind,
     encodeState, decodeState, encodeStateV2, decodeStateV2, shareHash, stateFromHash,
-    whenText, friendlyRule, signSummary, tidyAddress, shareText, shareSummary, icsEvent
+    whenText, vehicleMatters, friendlyRule, signSummary, tidyAddress, shareText, shareSummary, icsEvent
   };
   if (typeof module !== 'undefined') module.exports = api; else root.NYCSigns = api;
 })(this);

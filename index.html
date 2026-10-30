@@ -182,7 +182,7 @@ input.switch:checked::after{transform:translateX(20px)}
 .verdict.no{background:linear-gradient(155deg,#D92D33 0%,#A8161F 100%)}
 .verdict.warn{background:linear-gradient(155deg,#FFC94A 0%,#F59E0B 100%);color:#2B1800}
 .verdict.pop{animation:pop .38s cubic-bezier(.2,.9,.3,1.2)}
-.v-head{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.07em;font-size:13.5px;text-transform:uppercase}
+.v-head{display:flex;flex-wrap:wrap;row-gap:8px;align-items:center;column-gap:6px;font-weight:800;letter-spacing:.07em;font-size:13.5px;text-transform:uppercase}
 .v-icon{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.24);display:grid;place-items:center;flex:none}
 .warn .v-icon{background:rgba(43,24,0,.12)}
 .v-icon .ic{width:20px;height:20px;stroke-width:3}
@@ -193,6 +193,12 @@ input.switch:checked::after{transform:translateX(20px)}
 .v-count{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.22);padding:5px 11px 5px 9px;border-radius:999px;font-variant-numeric:tabular-nums}
 .warn .v-count{background:rgba(43,24,0,.12)}
 .v-count .ic{width:16px;height:16px}
+.v-head>span:nth-child(2){white-space:nowrap}
+.v-veh{margin-left:auto;display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;letter-spacing:0;text-transform:none;padding:4px 8px 4px 7px;border-radius:999px;background:rgba(255,255,255,.24);white-space:nowrap}
+.warn .v-veh{background:rgba(43,24,0,.12)}
+.v-veh .ic{width:13px;height:13px;stroke-width:2.4}
+.v-veh.dim{background:transparent;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.4);opacity:.88}
+.warn .v-veh.dim{box-shadow:inset 0 0 0 1.5px rgba(43,24,0,.25)}
 .v-lines{list-style:none;margin:16px 0 0;padding:12px 0 0;border-top:1px solid rgba(255,255,255,.28)}
 .warn .v-lines{border-top-color:rgba(43,24,0,.18)}
 .v-lines li{font-size:15px;line-height:1.4;margin:7px 0;padding-left:16px;position:relative}
@@ -603,7 +609,9 @@ function arrowOf(slot){ const el=slot.root.querySelector('input[type=radio]:chec
 function otherHasSign(slot){ return slots.some(s=>s!==slot && (s.txt.value.trim() || s.builderTouched)); }
 // ---- verdict card ----
 const VHEAD={ok:['i-check','Can park now'], warn:['i-alert','Heads up'], no:['i-x','Cannot park now']};
-function headHtml(kind,label){ const [ic,def]=VHEAD[kind]||VHEAD.warn; return `<div class="v-head"><span class="v-icon">${icon(ic)}</span>${esc(label||def)}</div>`; }
+function headHtml(kind,label,extra){ const [ic,def]=VHEAD[kind]||VHEAD.warn; return `<div class="v-head"><span class="v-icon">${icon(ic)}</span><span>${esc(label||def)}</span>${extra||''}</div>`; }
+// Small chip in the verdict card that says which vehicle the answer is for. Dimmed when no sign cares.
+function vehicleChip(isCom, matters){ return `<span class="v-veh${matters?'':' dim'}" data-veh="${isCom?'commercial':'passenger'}" title="${matters?'This sign treats commercial plates differently':'Same rules for any vehicle'}">${icon('i-car')}${isCom?'Commercial plates':'Passenger car'}</span>`; }
 function problemHtml(title, line){ return `<div class="big">${title}</div><div class="line">${line}</div>`; }
 function showVerdict(kind, html, quiet){
   stopCountdown();
@@ -684,7 +692,12 @@ function check(opts){
   if(problems.length){ lastCheck=null; showVerdict('warn', problems.join(''), quiet); if(shown.length) renderParsed(shown); else $('parsedCard').style.display='none'; return; }
   if(!sides.length){ lastCheck=null; showVerdict('warn', problemHtml('Add a sign first','Snap, type, or build the sign in front of your car, or set its arrow to point toward the car.'), quiet); $('parsedCard').style.display='none'; return; }
   const now=new Date();
-  const r=NYCRules.evaluateSides(sides, now, ASP.holidays, {commercial:$('commercial').checked});
+  const isCom=$('commercial').checked;
+  const r=NYCRules.evaluateSides(sides, now, ASP.holidays, {commercial:isCom});
+  const allRules=sides.flatMap(s=>s.rules||[]);
+  const vehMatters=NYCSigns.vehicleMatters(allRules);
+  const alt=vehMatters?NYCRules.evaluateSides(sides, now, ASP.holidays, {commercial:!isCom}):null;
+  const vehDiff=!!alt && (alt.canPark!==r.canPark || +(alt.nextViolation||0)!==+(r.nextViolation||0) || +(alt.okAt||0)!==+(r.okAt||0));
   const F=NYCRules.fmt;
   const lines=[]; let kind, label, key, when='';
   const hnum=m=>{ const h=m/60; return Number.isInteger(h)?h:h.toFixed(1); };
@@ -697,7 +710,7 @@ function check(opts){
       key=`<div class="v-key"><small>${r.violationIsTimeLimit?'Time is up at':'Move by'}</small>${esc(tOnly(r.nextViolation))}</div>`;
       when=`<div class="v-when"><span>${esc(dayLabel(r.nextViolation,now))}</span><span class="v-count">${icon('i-clock')}<b></b> left</span></div>`;
     } else {
-      key='<div class="v-key text"><small>No restriction found</small>All clear</div>';
+      key=(isCom&&vehMatters)?'<div class="v-key text"><small>Commercial-only zone</small>OK for you</div>':'<div class="v-key text"><small>No restriction found</small>All clear</div>';
       when=r.upcomingLimit?`<div class="v-when"><span>No ban ahead. A time limit starts ${esc(dayLabel(r.upcomingLimit.start,now).replace(/^(Today|Tomorrow)$/,x=>x.toLowerCase()))} at ${esc(tOnly(r.upcomingLimit.start))}.</span></div>`:'<div class="v-when"><span>Nothing kicks in for the next 2 weeks.</span></div>';
     }
     if(r.limit) lines.push(`${hrs(r.limit.minutes)} max${r.limit.metered?' · pay the meter or use ParkNYC':''}${wherePhrase([{side:r.limit.side}])}.`);
@@ -716,11 +729,17 @@ function check(opts){
     if(r.okAt) lines.push(`OK from <b>${esc(F(r.okAt))}</b>${r.blockedBy.length>1?', when every sign that applies allows it':''}.`);
     if(r.limitAtOk) lines.push(`Then a ${hrAdj(r.limitAtOk.minutes)} limit${r.limitAtOk.metered?' (metered)':''} applies until ${esc(F(r.limitAtOk.windowEnd))}${wherePhrase([{side:r.limitAtOk.side}])}.`);
   }
+  if(vehMatters){
+    const altTxt=a=>a.canPark?(a.nextViolation?`could park until ${esc(NYCSigns.whenText(a.nextViolation,now))}`:'could park, with nothing kicking in soon'):(a.okAt?`can't park until ${esc(NYCSigns.whenText(a.okAt,now))}`:"can't park here at any time");
+    if(!vehDiff) lines.push(`This sign has a commercial-vehicle rule, but it gives the same answer for any vehicle right now.`);
+    else if(isCom) lines.push(`Checked for <b>commercial plates</b>. A passenger car ${altTxt(alt)}.`);
+    else lines.push(`Checked for a <b>passenger car</b>. With commercial plates you ${altTxt(alt)}. Turn on <b>Commercial plates</b> above if yours has them.`);
+  } else if(isCom) lines.push('These signs are the same for every vehicle, so commercial plates don’t change the answer.');
   for(const ign of r.ignored||[]) lines.push(`The sign ${ign.id==='behind'?'behind the car':'in front of the car'} points away, so it was not used.`);
   const small=[];
   for(const slot of usedBuilder) small.push(`Used ${slotName(slot).toLowerCase()} from “Build a sign quickly” because its text was empty.`);
   small.push(`Checked ${esc(F(now))} NYC time. Also watch for hydrants, driveways, and bus stops.`);
-  const html=headHtml(kind,label)+key+when+'<ul class="v-lines">'+lines.map(l=>`<li>${l}</li>`).join('')+small.map(l=>`<li class="small">${l}</li>`).join('')+'</ul>';
+  const html=headHtml(kind,label,vehicleChip(isCom,vehMatters))+key+when+'<ul class="v-lines">'+lines.map(l=>`<li>${l}</li>`).join('')+small.map(l=>`<li class="small">${l}</li>`).join('')+'</ul>';
   showVerdict(kind, html, quiet);
   if(shown.length) renderParsed(shown); else $('parsedCard').style.display='none';
   const whenDate=r.canPark?r.nextViolation:r.okAt;
@@ -733,11 +752,14 @@ function check(opts){
     whenKind:r.canPark?(r.nextViolation?'move':''):(r.okAt?'open':''),
     isTimeLimit:!!(r.canPark&&r.violationIsTimeLimit),
     rules:sides.flatMap(s=>s.rules||[]),
-    commercial:$('commercial').checked,
+    commercial:isCom,
+    vehMatters,
     at:now
   };
 }
 $('checkBtn').onclick=()=>check();
+// Flipping the plates switch after a check re-runs it right away so the card never shows a stale answer.
+$('commercial').addEventListener('change',()=>{ if(!$('resultBody').hidden) check({quiet:true}); });
 // ---- photo crop + OCR (one framer per sign) ----
 let ocrWorker=null, ocrPass=0, ocrTotal=1, ocrSlot=null, ocrBusy=false;
 function sizeCanvas(slot){
@@ -934,7 +956,7 @@ function onSave(){
   if(!lastCheck){ $('shareStatus').textContent='Check the signs first, then save.'; return; }
   const id=String(Date.now());
   const list=readSpots();
-  list.unshift({id, savedAt:new Date().toISOString(), address:(place&&place.label)||($('loc').innerText||'').split('\n')[0], verdict:lastCheck.verdictLine+(lastCheck.whenLine?' · '+lastCheck.whenLine:''), state:currentState()});
+  list.unshift({id, savedAt:new Date().toISOString(), address:(place&&place.label)||($('loc').innerText||'').split('\n')[0], verdict:lastCheck.verdictLine+(lastCheck.whenLine?' · '+lastCheck.whenLine:'')+(lastCheck.vehMatters?' · '+(lastCheck.commercial?'Commercial plates':'Passenger car'):''), state:currentState()});
   writeSpots(list); renderSpots(); $('shareStatus').textContent='Saved on this phone.';
 }
 function onIcs(){
